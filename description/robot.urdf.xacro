@@ -2,5 +2,6 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro"  name="robot">
 
      <xacro:include filename="$(find mobile_robot)/description/xacro/robot_core.xacro" />
+     <xacro:include filename="$(find mobile_robot)/description/xacro/gazebo_control.xacro"/>
 
 </robot>

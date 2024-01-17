@@ -1,41 +1,42 @@
-import os
-
+from launch_ros.actions import Node
+from launch import LaunchDescription
+from launch.substitutions import Command
 from ament_index_python.packages import get_package_share_directory
 
-from launch import LaunchDescription
-from launch.substitutions import LaunchConfiguration
-from launch.actions import DeclareLaunchArgument
-from launch_ros.actions import Node
-
-import xacro
 
 
 def generate_launch_description():
-
-    # Check if we're told to use sim time
-    use_sim_time = LaunchConfiguration('use_sim_time')
-
-    # Process the URDF file
-    pkg_path = os.path.join(get_package_share_directory('mobile_robot'))
-    xacro_file = os.path.join(pkg_path,'description','robot.urdf.xacro')
-    robot_description_config = xacro.process_file(xacro_file)
     
-    # Create a robot_state_publisher node
-    params = {'robot_description': robot_description_config.toxml(), 'use_sim_time': use_sim_time}
-    node_robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        output='screen',
-        parameters=[params]
-    )
+    package_name = 'mobile_robot'
+    
+    xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
 
 
-    # Launch!
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'use_sim_time',
-            default_value='false',
-            description='Use sim time if true'),
+	# RViz
+    rviz_config_file = get_package_share_directory(package_name) + "/config/camera.rviz"
+    rviz_node = Node(package    ='rviz2',
+					 executable ='rviz2',
+					 name       ='rviz2',
+					 output     ='log',
+					 arguments  =['-d', rviz_config_file])
 
-        node_robot_state_publisher
-    ])
+
+	
+	# Robot State Publisher 
+    robot_state_publisher = Node(package    ='robot_state_publisher',
+								 executable ='robot_state_publisher',
+								 name       ='robot_state_publisher',
+								 output     ='both',
+								 parameters =[{'robot_description': Command(['xacro', ' ', xacro_file])           
+								}])
+
+
+	# Joint State Publisher 
+    joint_state_publisher_gui = Node(package  ='joint_state_publisher_gui',
+									executable='joint_state_publisher_gui',
+									output    ='screen',
+									name      ='joint_state_publisher_gui')
+
+
+    return LaunchDescription([robot_state_publisher, joint_state_publisher_gui, rviz_node ])
+	# return LaunchDescription([robot_state_publisher, rviz_node ])
