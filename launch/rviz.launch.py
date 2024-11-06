@@ -2,11 +2,10 @@ import os
 
 import torch
 
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
 from launch import LaunchDescription
 from launch.substitutions import Command, LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
-from launch.actions import DeclareLaunchArgument
 
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -18,6 +17,11 @@ def generate_launch_description():
     package_name = 'mobile_robot'
     
     xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
+
+    # Force to use sim time
+    sim_time = LaunchDescription([
+        SetParameter(name='use_sim_time', value=True)
+    ])
 
 	# RViz
     rviz_config_file = get_package_share_directory(package_name) + "/config/camera.rviz"
@@ -37,12 +41,20 @@ def generate_launch_description():
                 "device": LaunchConfiguration("device", default="cuda" if torch.cuda.is_available() else "cpu"),
                 "enable": LaunchConfiguration("enable", default="True"),
                 "threshold": LaunchConfiguration("threshold", default="0.5"),
-                "input_image_topic": LaunchConfiguration("input_image_topic", default="/camera/rgb/image_raw"),
+                "input_image_topic": LaunchConfiguration("input_image_topic", default="/camera/image_raw"),
                 "image_reliability": LaunchConfiguration("image_reliability", default="2"),
                 "namespace": LaunchConfiguration("namespace", default="yolo"),
             }.items(),
         )
-
+    
+    viz_node = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(get_package_share_directory(
+                    "yolo_detection"), "launch", "viz.launch.py")),
+            launch_arguments={
+                "image_reliability": LaunchConfiguration("image_reliability", default="1"),
+            }.items(),
+        )
 
 	# Robot State Publisher 
     robot_state_publisher = Node(package='robot_state_publisher',
@@ -61,8 +73,10 @@ def generate_launch_description():
 
 
     return LaunchDescription([
+        sim_time,
         robot_state_publisher, 
         joint_state_publisher_gui, 
-        rviz_node, 
+        rviz_node,
+        viz_node,
         detector_node,
     ])
