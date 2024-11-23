@@ -41,9 +41,12 @@ def generate_launch_description():
                 "device": LaunchConfiguration("device", default="cuda" if torch.cuda.is_available() else "cpu"),
                 "enable": LaunchConfiguration("enable", default="True"),
                 "threshold": LaunchConfiguration("threshold", default="0.5"),
-                "input_image_topic": LaunchConfiguration("input_image_topic", default="/camera/image_raw"),
                 "image_reliability": LaunchConfiguration("image_reliability", default="2"),
                 "namespace": LaunchConfiguration("namespace", default="yolo"),
+                "to_posestamped": LaunchConfiguration("to_posestamped", default=True),
+                "to_pointcloud": LaunchConfiguration("to_pointcloud", default=True),
+                "visualize": LaunchConfiguration("visualize", default=True),
+                "stereo_vision": LaunchConfiguration("stereo_vision", default=True)
             }.items(),
         )
     

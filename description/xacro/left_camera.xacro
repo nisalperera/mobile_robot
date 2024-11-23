@@ -54,7 +54,7 @@
                 </clip>
             </camera>
             <plugin name="left_camera_controller" filename="libgazebo_ros_camera.so">
-                <robotNamespace>left_camera</robotNamespace>
+                <!-- <robotNamespace>left_camera</robotNamespace> -->
                 <frame_name>left_camera_link_optical</frame_name>
             </plugin>
         </sensor>
