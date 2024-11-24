@@ -31,32 +31,35 @@ def generate_launch_description():
 					 output='log',
 					 arguments=['-d', rviz_config_file])
     
-    detector_node = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(get_package_share_directory(
-                    "yolo_launch"), "launch", "yolov8.launch.py")),
-            launch_arguments={
-                "model": LaunchConfiguration("model", default="yolov10m.pt"),
-                "tracker": LaunchConfiguration("tracker", default="bytetrack.yaml"),
-                "device": LaunchConfiguration("device", default="cuda" if torch.cuda.is_available() else "cpu"),
-                "enable": LaunchConfiguration("enable", default="True"),
-                "threshold": LaunchConfiguration("threshold", default="0.5"),
-                "image_reliability": LaunchConfiguration("image_reliability", default="2"),
-                "namespace": LaunchConfiguration("namespace", default="yolo"),
-                "to_posestamped": LaunchConfiguration("to_posestamped", default=True),
-                "to_pointcloud": LaunchConfiguration("to_pointcloud", default=True),
-                "visualize": LaunchConfiguration("visualize", default=True),
-                "stereo_vision": LaunchConfiguration("stereo_vision", default=True)
-            }.items(),
+    detector_node = Node(
+            package='yolo_detection',
+            executable='detector',
+            name='yolo_node',
+            parameters=[{
+                'model': 'yolov10m.pt',
+                'tracker': 'bytetrack.yaml',
+                'device': 'cuda' if torch.cuda.is_available() else 'cpu',
+                'enable': True,
+                'threshold': 0.5,
+                'image_reliability': 1,
+                'to_posestamped': True,
+                'to_pointcloud': True,
+                'visualize': True,
+                'stereo_vision': True
+            }],
+            namespace='yolo'
         )
     
-    viz_node = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(get_package_share_directory(
-                    "yolo_detection"), "launch", "viz.launch.py")),
-            launch_arguments={
-                "image_reliability": LaunchConfiguration("image_reliability", default="1"),
-            }.items(),
+    viz_node = Node(
+            package='yolo_detection',
+            executable='visualizer',
+            name='viz_node',
+            parameters=[{
+                'image_reliability': 1,
+                'enable': True,
+                'log_image': True
+            }],
+            namespace='yolo'
         )
 
 	# Robot State Publisher 
