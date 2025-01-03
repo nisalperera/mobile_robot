@@ -2,11 +2,17 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
     <gazebo>
-        <plugin name="motor_contro" filename="libgazebo_ros_diff_drive.so">
+        <plugin name="motor_control" filename="libgazebo_ros_diff_drive.so">
 
-            <!-- Wheels -->
-            <left_joint>left_wheel_joint</left_joint>
-            <right_joint>right_wheel_joint</right_joint>
+            <!-- Front Wheels -->
+            <left_joint>front_left_wheel_joint</left_joint>
+            <right_joint>front_right_wheel_joint</right_joint>
+
+            <!-- Rear Wheels -->
+            <left_rear_joint>rear_left_wheel_joint</left_rear_joint>
+            <right_rear_joint>rear_right_wheel_joint</right_rear_joint>
+
+            <!-- Wheel Configuration -->
             <wheel_separation>0.35</wheel_separation>
             <wheel_diameter>0.1</wheel_diameter>
 
@@ -18,9 +24,14 @@
             <odometry_frame>odom</odometry_frame>
             <robot_base_frame>base_link</robot_base_frame>
 
+            <!-- Publishing Options -->
             <publish_odom>true</publish_odom>
             <publish_odom_tf>true</publish_odom_tf>
             <publish_wheel_tf>true</publish_wheel_tf>
+
+            <!-- Additional Parameters for 4 Wheels -->
+            <legacyMode>false</legacyMode>
+            <updateRate>50.0</updateRate>
 
         </plugin>
     </gazebo>

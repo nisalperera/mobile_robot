@@ -1,7 +1,5 @@
 import os
 
-import torch
-
 from launch_ros.actions import Node, SetParameter
 from launch import LaunchDescription
 from launch.substitutions import Command, LaunchConfiguration
@@ -24,43 +22,16 @@ def generate_launch_description():
     ])
 
 	# RViz
-    rviz_config_file = get_package_share_directory(package_name) + "/config/camera.rviz"
+    # if os.path.exists(get_package_share_directory(package_name) + "/config/camera.rviz"):
+    #     rviz_config_file = get_package_share_directory(package_name) + "/config/camera.rviz"
+    # else:
+    rviz_config_file = get_package_share_directory(package_name) + "/config/default.rviz"
     rviz_node = Node(package='rviz2',
 					 executable='rviz2',
 					 name='rviz2',
 					 output='log',
-					 arguments=['-d', rviz_config_file])
-    
-    detector_node = Node(
-            package='yolo_detection',
-            executable='detector',
-            name='yolo_node',
-            parameters=[{
-                'model': 'yolov10m.pt',
-                'tracker': 'bytetrack.yaml',
-                'device': 'cuda' if torch.cuda.is_available() else 'cpu',
-                'enable': True,
-                'threshold': 0.5,
-                'image_reliability': 1,
-                'to_posestamped': True,
-                'to_pointcloud': True,
-                'visualize': True,
-                'stereo_vision': True
-            }],
-            namespace='yolo'
-        )
-    
-    viz_node = Node(
-            package='yolo_detection',
-            executable='visualizer',
-            name='viz_node',
-            parameters=[{
-                'image_reliability': 1,
-                'enable': True,
-                'log_image': True
-            }],
-            namespace='yolo'
-        )
+					 arguments=['-d', rviz_config_file]
+                )
 
 	# Robot State Publisher 
     robot_state_publisher = Node(package='robot_state_publisher',
@@ -83,6 +54,4 @@ def generate_launch_description():
         robot_state_publisher, 
         joint_state_publisher_gui, 
         rviz_node,
-        viz_node,
-        detector_node,
     ])
