@@ -42,16 +42,58 @@ def generate_launch_description():
 								}])
 
 
-	# Joint State Publisher 
-    joint_state_publisher_gui = Node(package='joint_state_publisher_gui',
-									executable='joint_state_publisher_gui',
-									output='screen',
-									name='joint_state_publisher_gui')
+	# # Joint State Publisher 
+    # joint_state_publisher_gui = Node(package='joint_state_publisher_gui',
+	# 								executable='joint_state_publisher_gui',
+	# 								output='screen',
+	# 								name='joint_state_publisher_gui')
+
+    if os.environ.get("DEEPLEARNING", "false") == "true":
+        import torch
+        detector_node = Node(
+                package='yolo_detection',
+                executable='detector',
+                name='yolo_node',
+                parameters=[{
+                    'model': 'yolov10m.pt',
+                    'tracker': 'bytetrack.yaml',
+                    'device': 'cuda' if torch.cuda.is_available() else 'cpu',
+                    'enable': True,
+                    'threshold': 0.5,
+                    'image_reliability': 1,
+                    'to_posestamped': True,
+                    'to_pointcloud': True,
+                    'visualize': True,
+                    'stereo_vision': True
+                }],
+                namespace='yolo'
+            )
+        
+        viz_node = Node(
+                package='yolo_detection',
+                executable='visualizer',
+                name='viz_node',
+                parameters=[{
+                    'image_reliability': 1,
+                    'enable': True,
+                    'log_image': True
+                }],
+                namespace='yolo'
+            )
 
 
-    return LaunchDescription([
-        sim_time,
-        robot_state_publisher, 
-        joint_state_publisher_gui, 
-        rviz_node,
-    ])
+        return LaunchDescription([
+            sim_time,
+            robot_state_publisher, 
+            # joint_state_publisher_gui, 
+            rviz_node,
+            detector_node,
+            viz_node
+        ])
+    else:
+        return LaunchDescription([
+            sim_time,
+            robot_state_publisher, 
+            # joint_state_publisher_gui, 
+            rviz_node,
+        ])
