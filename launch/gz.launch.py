@@ -81,14 +81,14 @@ def generate_launch_description():
                     launch_arguments={'use_sim_time': 'true', 'params_file': slam_params_file}.items()
     )
 
-    aclm_params_file = os.path.join(get_package_share_directory(package_name),'config','nav2_params.yaml')
+    amcl_params_file = os.path.join(get_package_share_directory(package_name),'config','nav2_params.yaml')
     map_file = os.path.join(get_package_share_directory(package_name),'maps','map_save.yaml')
-    aclm = IncludeLaunchDescription(
+    amcl = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [os.path.join(get_package_share_directory(package_name),'launch','localization_launch.py')]), 
                     launch_arguments={
                         'use_sim_time': 'true', 
-                        'params_file': aclm_params_file,
+                        'params_file': amcl_params_file,
                         'map': map_file
                     }.items()
     )
@@ -114,5 +114,5 @@ def generate_launch_description():
         diff_drive_spawner,
         joint_broad_spawner,
         slam,
-        aclm
+        amcl
     ])
