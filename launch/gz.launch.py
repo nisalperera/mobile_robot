@@ -16,24 +16,16 @@ def generate_launch_description():
     package_name='mobile_robot'
 
     rviz = IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([os.path.join(
-                    get_package_share_directory(package_name),'launch','rviz.launch.py'
-                )]), launch_arguments={'use_sim_time': 'true', 'use_ros2_control': 'true'}.items()
+                PythonLaunchDescriptionSource(
+                    [os.path.join(get_package_share_directory(package_name),'launch','rviz.launch.py')]), 
+                    launch_arguments={'use_sim_time': 'true', 'use_ros2_control': 'true'}.items(),
     )
 
     joystick = IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([os.path.join(
-                    get_package_share_directory(package_name),'launch','joystick.launch.py'
-                )]), launch_arguments={'use_sim_time': 'true'}.items()
+                PythonLaunchDescriptionSource(
+                    [os.path.join(get_package_share_directory(package_name),'launch','joystick.launch.py')]), 
+                    launch_arguments={'use_sim_time': 'true'}.items()
     )
-
-    twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
-    twist_mux = Node(
-            package="twist_mux",
-            executable="twist_mux",
-            parameters=[twist_mux_params, {'use_sim_time': True}],
-            remappings=[('/cmd_vel_out','/diff_cont/cmd_vel_unstamped')]
-        )
 
     gazebo_params_file = os.path.join(get_package_share_directory(package_name),'config','gazebo_params.yaml')
 
@@ -50,20 +42,24 @@ def generate_launch_description():
     spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
                         arguments=['-topic', 'robot_description',
                                    '-entity', package_name],
-                        output='screen')
+                        output='screen',
+                        # namespace=package_name
+                    )
 
     diff_drive_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        name="diff_drive",
-        arguments=["diff_cont"],
+        name="diff_drive_controller",
+        arguments=["diff_drive_controller"],
+        # namespace=package_name
     )
 
     joint_broad_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        name="joint_broad",
-        arguments=["joint_broad"],
+        name="joint_state_broadcaster",
+        arguments=["joint_state_broadcaster"],
+        # namespace=package_name
     )
 
     controller_params_file = os.path.join(get_package_share_directory(package_name),'config','controllers.yaml')
@@ -74,14 +70,15 @@ def generate_launch_description():
             controller_params_file,
             {"use_sim_time": True}],
         output="both",
-        respawn=True
+        respawn=True,
+        # namespace=package_name
     )
 
-    delayed_controller_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=control_node,
-            on_exit=[joint_broad_spawner, diff_drive_spawner],
-        )
+    slam_params_file = os.path.join(get_package_share_directory(package_name),'config','mapper_params_online_async.yaml')
+    slam = IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [os.path.join(get_package_share_directory(package_name),'launch','online_async_launch.py')]), 
+                    launch_arguments={'use_sim_time': 'true', 'params_file': slam_params_file}.items()
     )
 
     # return LaunchDescription([
@@ -98,9 +95,11 @@ def generate_launch_description():
     return LaunchDescription([
         rviz,
         joystick,
-        twist_mux,
+        # twist_mux,
         control_node,  # Move this before gazebo
         gazebo,
         spawn_entity,
-        delayed_controller_spawner
+        diff_drive_spawner,
+        joint_broad_spawner,
+        slam
     ])
