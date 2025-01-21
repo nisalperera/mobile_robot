@@ -85,7 +85,7 @@ def generate_launch_description():
     map_file = os.path.join(get_package_share_directory(package_name),'maps','map_save.yaml')
     amcl = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    [os.path.join(get_package_share_directory(package_name),'launch','localization_launch.py')]), 
+                    [os.path.join(get_package_share_directory(package_name),'launch','localization.launch.py')]), 
                     launch_arguments={
                         'use_sim_time': 'true', 
                         'params_file': amcl_params_file,
@@ -93,26 +93,39 @@ def generate_launch_description():
                     }.items()
     )
 
-    # return LaunchDescription([
-    #     rviz,
-    #     joystick,
-    #     twist_mux,
-    #     gazebo,
-    #     spawn_entity,
-    #     # diff_drive_spawner,
-    #     # joint_broad_spawner
-    #     control_node,
-    #     delayed_controller_spawner
-    # ])
+    # Launch Nav2
+    # navigation = IncludeLaunchDescription(
+    #             PythonLaunchDescriptionSource(
+    #                 [os.path.join(get_package_share_directory(package_name),'launch','navigation_launch.py')]), 
+    #                 launch_arguments={
+    #                     'use_sim_time': 'true',
+    #                 }.items()
+    # )
+
+    navigation = IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        [os.path.join(get_package_share_directory(package_name),'launch','navigation.launch.py')]), 
+                        launch_arguments={'use_sim_time': 'true'}.items()
+    )
+
+    twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
+    twist_mux = Node(
+            package="twist_mux",
+            executable="twist_mux",
+            parameters=[twist_mux_params, {'use_sim_time': True}],
+            remappings=[('/cmd_vel_out','/diff_drive_controller/cmd_vel_unstamped')]
+        )
+
     return LaunchDescription([
         rviz,
         joystick,
-        # twist_mux,
         control_node,  # Move this before gazebo
         gazebo,
         spawn_entity,
         diff_drive_spawner,
         joint_broad_spawner,
         slam,
-        amcl
+        amcl, 
+        navigation,
+        twist_mux,
     ])
