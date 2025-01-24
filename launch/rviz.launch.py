@@ -25,10 +25,6 @@ def generate_launch_description():
         SetParameter(name='use_sim_time', value=use_sim_time)
     ])
 
-	# RViz
-    # if os.path.exists(get_package_share_directory(package_name) + "/config/camera.rviz"):
-    #     rviz_config_file = get_package_share_directory(package_name) + "/config/camera.rviz"
-    # else:
     rviz_config_file = get_package_share_directory(package_name) + "/config/default.rviz"
     rviz_node = Node(package='rviz2',
 					 executable='rviz2',
