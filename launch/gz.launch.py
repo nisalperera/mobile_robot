@@ -43,6 +43,7 @@ def generate_launch_description():
                         arguments=['-topic', 'robot_description',
                                    '-entity', package_name],
                         output='screen',
+                        parameters=[{'use_sim_time': True}]
                         # namespace=package_name
                     )
 
@@ -51,6 +52,7 @@ def generate_launch_description():
         executable="spawner",
         name="diff_drive_controller",
         arguments=["diff_drive_controller"],
+        parameters=[{'use_sim_time': True}]
         # namespace=package_name
     )
 
@@ -59,6 +61,7 @@ def generate_launch_description():
         executable="spawner",
         name="joint_state_broadcaster",
         arguments=["joint_state_broadcaster"],
+        parameters=[{'use_sim_time': True}]
         # namespace=package_name
     )
 
@@ -68,7 +71,8 @@ def generate_launch_description():
         executable="ros2_control_node",
         parameters=[
             controller_params_file,
-            {"use_sim_time": True}],
+            {"use_sim_time": True},
+            {"tf_buffer_duration": 10.0}],
         output="both",
         respawn=True,
         # namespace=package_name
