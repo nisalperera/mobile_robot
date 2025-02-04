@@ -13,7 +13,7 @@
                 <param name="device">/dev/ttyUSB0</param>
                 <param name="baud_rate">57600</param>
                 <param name="timeout">1000</param>
-                <param name="enc_counts_per_rev">3436</param>
+                <param name="enc_counts_per_rev">11</param>
             </hardware>
             <joint name="front_left_wheel_joint">
                 <command_interface name="velocity">
@@ -53,7 +53,7 @@
     <xacro:if value="$(arg sim_mode)">
         <ros2_control name="GazeboSystem" type="system">
             <hardware>
-                <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+                <plugin>ign_ros2_control/IgnitionSystem</plugin>
             </hardware>
             <joint name="front_left_wheel_joint">
                 <command_interface name="velocity">
@@ -91,12 +91,9 @@
     </xacro:if>
 
     <gazebo>
-        <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
+        <plugin filename="libign_ros2_control-system.so" name="ign_ros2_control::IgnitionROS2ControlPlugin">
             <parameters>$(find mobile_robot)/config/controllers.yaml</parameters>
             <parameters>$(find mobile_robot)/config/gaz_ros2_ctl_use_sim.yaml</parameters>
-            <!-- <ros>
-                <namespace>mobile_robot</namespace>
-            </ros> -->
         </plugin>
     </gazebo>
 

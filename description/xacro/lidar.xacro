@@ -31,14 +31,12 @@
         </xacro:inertial_cylinder>
     </link>
 
-
-
     <gazebo reference="laser_frame">
         <material>Gazebo/Red</material>
 
-        <sensor name="laser" type="ray">
+        <sensor name="laser" type="gpu_ray">
             <pose> 0 0 0 0 0 0 </pose>
-            <visualize>false</visualize>
+            <visualize>true</visualize>
             <update_rate>10</update_rate>
             <ray>
                 <scan>
@@ -53,14 +51,14 @@
                     <max>12</max>
                 </range>
             </ray>
-            <plugin name="laser_controller" filename="libgazebo_ros_ray_sensor.so">
-                <ros>
-                    <argument> ~/out:=scan</argument>
-                </ros>
-                <output_type>sensor_msgs/LaserScan</output_type>
-                <frame_name>laser_frame</frame_name>
+            <topic>scan</topic>
+            <gz_frame_id>laser_frame</gz_frame_id>
+            <always_on>1</always_on>
+            <plugin filename="libignition-gazebo-sensors-system.so" 
+                    name="ignition::gazebo::systems::Sensors">
             </plugin>
         </sensor>
     </gazebo>
+
 
 </robot>
