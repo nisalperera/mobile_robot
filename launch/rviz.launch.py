@@ -18,12 +18,16 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
 
-    xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
-
     # Force to use sim time
     sim_time = LaunchDescription([
         SetParameter(name='use_sim_time', value=use_sim_time)
     ])
+
+    sim_time = LaunchDescription([
+        SetParameter(name='use_ros2_control', value=use_ros2_control)
+    ])
+
+    xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
 
     rviz_config_file = get_package_share_directory(package_name) + "/config/default.rviz"
     rviz_node = Node(package='rviz2',

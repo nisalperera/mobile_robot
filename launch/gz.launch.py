@@ -3,28 +3,41 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, RegisterEventHandler
+from launch.substitutions import LaunchConfiguration
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 from launch.event_handlers import OnProcessExit
-from launch_ros.actions import Node
-
+from launch_ros.actions import Node, SetParameter
 
 
 def generate_launch_description():
 
     package_name='mobile_robot'
 
+    # Check if we're told to use sim time
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    use_ros2_control = LaunchConfiguration('use_ros2_control')
+
+    # # Force to use sim time
+    # sim_time_ = LaunchDescription([
+    #     SetParameter(name='use_sim_time', value=use_sim_time)
+    # ])
+
+    # ros2control_ = LaunchDescription([
+    #     SetParameter(name='use_ros2_control', value=use_ros2_control)
+    # ])
+
     rviz = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [os.path.join(get_package_share_directory(package_name),'launch','rviz.launch.py')]), 
-                    launch_arguments={'use_sim_time': 'true', 'use_ros2_control': 'true'}.items(),
+                    launch_arguments={'use_sim_time': use_sim_time, 'use_ros2_control': use_ros2_control}.items(),
     )
 
     joystick = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [os.path.join(get_package_share_directory(package_name),'launch','joystick.launch.py')]), 
-                    launch_arguments={'use_sim_time': 'true'}.items()
+                    launch_arguments={'use_sim_time': use_sim_time}.items()
     )
 
     gazebo_params_file = os.path.join(get_package_share_directory(package_name),'config','gazebo_params.yaml')
@@ -82,7 +95,7 @@ def generate_launch_description():
     slam = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [os.path.join(get_package_share_directory(package_name),'launch','online_async_launch.py')]), 
-                    launch_arguments={'use_sim_time': 'true', 'params_file': slam_params_file}.items()
+                    launch_arguments={'use_sim_time': use_sim_time, 'params_file': slam_params_file}.items()
     )
 
     amcl_params_file = os.path.join(get_package_share_directory(package_name),'config','nav2_params.yaml')
@@ -91,7 +104,7 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(
                     [os.path.join(get_package_share_directory(package_name),'launch','localization.launch.py')]), 
                     launch_arguments={
-                        'use_sim_time': 'true', 
+                        'use_sim_time': use_sim_time, 
                         'params_file': amcl_params_file,
                         'map': map_file
                     }.items()
@@ -100,7 +113,7 @@ def generate_launch_description():
     navigation = IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
                         [os.path.join(get_package_share_directory(package_name),'launch','navigation.launch.py')]), 
-                        launch_arguments={'use_sim_time': 'true'}.items()
+                        launch_arguments={'use_sim_time': use_sim_time}.items()
     )
 
     twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
@@ -112,6 +125,14 @@ def generate_launch_description():
         )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+                'use_sim_time',
+                default_value='false',
+                description='Use sim time if true'),
+        DeclareLaunchArgument(
+            'use_ros2_control',
+            default_value='true',
+            description='Use ros2_control if true'),
         rviz,
         joystick,
         control_node,  # Move this before gazebo
