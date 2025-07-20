@@ -1,15 +1,29 @@
 import os
+import logging
 
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 from launch.event_handlers import OnProcessExit
 from launch_ros.actions import Node, SetParameter
+# from launch_ros.logging import get_logger
 
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('launch')
+
+def log_args(context, *args, **kwargs):
+    package_name = 'mobile_robot'
+    logger.info(
+        f"Launching {package_name} with use_sim_time: {LaunchConfiguration('use_sim_time').perform(context)}, "
+        f"use_ros2_control: {LaunchConfiguration('use_ros2_control').perform(context)}, "
+        f"use_slam: {LaunchConfiguration('use_slam').perform(context)}, "
+    )
 
 def generate_launch_description():
 
@@ -18,15 +32,7 @@ def generate_launch_description():
     # Check if we're told to use sim time
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
-
-    # # Force to use sim time
-    # sim_time_ = LaunchDescription([
-    #     SetParameter(name='use_sim_time', value=use_sim_time)
-    # ])
-
-    # ros2control_ = LaunchDescription([
-    #     SetParameter(name='use_ros2_control', value=use_ros2_control)
-    # ])
+    use_slam = LaunchConfiguration('use_slam')
 
     rviz = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -56,7 +62,7 @@ def generate_launch_description():
                         arguments=['-topic', 'robot_description',
                                    '-entity', package_name],
                         output='screen',
-                        parameters=[{'use_sim_time': True}]
+                        parameters=[{'use_sim_time': use_sim_time}]
                         # namespace=package_name
                     )
 
@@ -65,7 +71,7 @@ def generate_launch_description():
         executable="spawner",
         name="diff_drive_controller",
         arguments=["diff_drive_controller"],
-        parameters=[{'use_sim_time': True}]
+        parameters=[{'use_sim_time': use_sim_time}]
         # namespace=package_name
     )
 
@@ -74,7 +80,7 @@ def generate_launch_description():
         executable="spawner",
         name="joint_state_broadcaster",
         arguments=["joint_state_broadcaster"],
-        parameters=[{'use_sim_time': True}]
+        parameters=[{'use_sim_time': use_sim_time}]
         # namespace=package_name
     )
 
@@ -84,7 +90,7 @@ def generate_launch_description():
         executable="ros2_control_node",
         parameters=[
             controller_params_file,
-            {"use_sim_time": True},
+            {"use_sim_time": use_sim_time},
             {"tf_buffer_duration": 10.0}],
         output="both",
         respawn=True,
@@ -95,7 +101,8 @@ def generate_launch_description():
     slam = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [os.path.join(get_package_share_directory(package_name),'launch','online_async_launch.py')]), 
-                    launch_arguments={'use_sim_time': use_sim_time, 'params_file': slam_params_file}.items()
+                    launch_arguments={'use_sim_time': use_sim_time, 'params_file': slam_params_file}.items(),
+                    condition=IfCondition(use_slam)
     )
 
     amcl_params_file = os.path.join(get_package_share_directory(package_name),'config','nav2_params.yaml')
@@ -107,20 +114,22 @@ def generate_launch_description():
                         'use_sim_time': use_sim_time, 
                         'params_file': amcl_params_file,
                         'map': map_file
-                    }.items()
+                    }.items(),
+                    condition=IfCondition(use_slam)
     )
 
     navigation = IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
                         [os.path.join(get_package_share_directory(package_name),'launch','navigation.launch.py')]), 
-                        launch_arguments={'use_sim_time': use_sim_time}.items()
+                        launch_arguments={'use_sim_time': use_sim_time}.items(), 
+                        condition=IfCondition(use_slam)
     )
 
     twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
     twist_mux = Node(
             package="twist_mux",
             executable="twist_mux",
-            parameters=[twist_mux_params, {'use_sim_time': True}],
+            parameters=[twist_mux_params, {'use_sim_time': use_sim_time}],
             remappings=[('/cmd_vel_out','/diff_drive_controller/cmd_vel_unstamped')]
         )
 
@@ -133,6 +142,11 @@ def generate_launch_description():
             'use_ros2_control',
             default_value='true',
             description='Use ros2_control if true'),
+        DeclareLaunchArgument(
+            'use_slam',
+            default_value='true',
+            description='Use NAV2 toolkit if true'),
+        OpaqueFunction(function=log_args),
         rviz,
         joystick,
         control_node,  # Move this before gazebo
