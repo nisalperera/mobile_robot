@@ -56,7 +56,7 @@ def generate_launch_description():
 	# 								output='screen',
 	# 								name='joint_state_publisher_gui')
 
-    if os.environ.get("DEEPLEARNING", "false") == "true":
+    if os.environ.get("ULTRALYTICS", "false") == "true":
         import torch
         detector_node = Node(
                 package='yolo_detection',
