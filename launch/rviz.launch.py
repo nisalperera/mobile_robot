@@ -19,13 +19,13 @@ def generate_launch_description():
     use_ros2_control = LaunchConfiguration('use_ros2_control')
 
     # Force to use sim time
-    sim_time = LaunchDescription([
-        SetParameter(name='use_sim_time', value=use_sim_time)
-    ])
+    # sim_time = LaunchDescription([
+    #     SetParameter(name='use_sim_time', value=use_sim_time)
+    # ])
 
-    sim_time = LaunchDescription([
-        SetParameter(name='use_ros2_control', value=use_ros2_control)
-    ])
+    # sim_time = LaunchDescription([
+    #     SetParameter(name='use_ros2_control', value=use_ros2_control)
+    # ])
 
     xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
 
@@ -91,7 +91,15 @@ def generate_launch_description():
 
 
         return LaunchDescription([
-            sim_time,
+            DeclareLaunchArgument(
+                'use_sim_time',
+                default_value='false',
+                description='Use sim time if true'),
+            DeclareLaunchArgument(
+                'use_ros2_control',
+                default_value='true',
+                description='Use ros2_control if true'),
+            # sim_time,
             robot_state_publisher, 
             # joint_state_publisher_gui, 
             rviz_node,
@@ -108,7 +116,7 @@ def generate_launch_description():
                 'use_ros2_control',
                 default_value='true',
                 description='Use ros2_control if true'),
-            sim_time,
+            # sim_time,
             robot_state_publisher, 
             # joint_state_publisher_gui, 
             rviz_node,

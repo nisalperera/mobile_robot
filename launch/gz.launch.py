@@ -14,7 +14,7 @@ from launch_ros.actions import Node, SetParameter
 # from launch_ros.logging import get_logger
 
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('launch')
 
 def log_args(context, *args, **kwargs):
@@ -135,9 +135,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument(
-                'use_sim_time',
-                default_value='false',
-                description='Use sim time if true'),
+            'use_sim_time',
+            default_value='true',
+            description='Use sim time if true'),
         DeclareLaunchArgument(
             'use_ros2_control',
             default_value='true',
