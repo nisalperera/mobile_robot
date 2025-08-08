@@ -5,7 +5,7 @@
   <version>0.0.1</version>
   <description>Autonomous mobile robot with sterio camera, LIDAR and teleops developed using ROS2 and Gazebo.</description>
   <maintainer email="chinthanapereranisal@gmail.com">Nisal Perera</maintainer>
-  <license>BSD</license>
+  <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
