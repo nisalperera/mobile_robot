@@ -3,8 +3,10 @@
 
     <xacro:arg name="use_ros2_control" default="false"/>
     <xacro:arg name="sim_mode" default="true"/>
+    <xacro:arg name="show_ray" default="false"/>
+    <xacro:arg name="show_camera" default="false"/>
 
-    <xacro:include filename="$(find mobile_robot)/description/xacro/robot_core.xacro" />
+    <xacro:include filename="$(find mobile_robot)/description/xacro/robot_core.xacro" /> 
 
     <!-- Control inclusion based on use_ros2_control argument -->
     <xacro:if value="${'$(arg use_ros2_control)' == 'true'}">

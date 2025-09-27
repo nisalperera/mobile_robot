@@ -3,9 +3,9 @@
 
     <xacro:include filename="$(find mobile_robot)/description/xacro/colors.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/inertial_macros.xacro" />
-    <xacro:include filename="$(find mobile_robot)/description/xacro/lidar.xacro" />
-    <xacro:include filename="$(find mobile_robot)/description/xacro/right_camera.xacro" />
-    <xacro:include filename="$(find mobile_robot)/description/xacro/left_camera.xacro" />
+    <xacro:include filename="$(find mobile_robot)/description/xacro/lidar.xacro" /> 
+    <!-- <xacro:include filename="$(find mobile_robot)/description/xacro/right_camera.xacro"/>  -->
+    <!-- <xacro:include filename="$(find mobile_robot)/description/xacro/left_camera.xacro"/>  -->
     <xacro:include filename="$(find mobile_robot)/description/xacro/left_wheels.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/right_wheels.xacro" />
 

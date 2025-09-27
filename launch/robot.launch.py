@@ -20,6 +20,10 @@ def generate_launch_description():
     use_ros2_control = LaunchConfiguration('use_ros2_control')
     use_slam = LaunchConfiguration('use_slam')
 
+    visualize_ray = LaunchConfiguration('show_ray', default='false')
+    visualize_camera = LaunchConfiguration('show_camera', default='false')
+    gpu_ray = LaunchConfiguration('gpu_ray', default='false')
+
     xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
 
 	# Robot State Publisher 
@@ -28,7 +32,14 @@ def generate_launch_description():
 								name='robot_state_publisher',
 								output='both',
 								parameters=[{
-                                        'robot_description': Command(['xacro', ' ', xacro_file, ' use_ros2_control:=', use_ros2_control, ' sim_mode:=', use_sim_time])           
+                                        'robot_description': Command([
+                                            'xacro', ' ', xacro_file, 
+                                            ' use_ros2_control:=', use_ros2_control, 
+                                            ' sim_mode:=', use_sim_time,
+                                            ' show_ray:=', visualize_ray,
+                                            ' show_camera:=', visualize_camera,
+                                            ' gpu_ray:=', gpu_ray
+                                        ]),
 								    }],
                             )
     
@@ -130,12 +141,25 @@ def generate_launch_description():
             'use_slam',
             default_value='true',
             description='Use ros2_control if true'),
+        DeclareLaunchArgument(
+            'show_ray',
+            default_value='false',
+            description='Visualize LiDAR rays if true'),
+        DeclareLaunchArgument(
+            'show_camera',
+            default_value='false',
+            description='Visualize Camera if true'),
+        DeclareLaunchArgument(
+            'gpu_ray',
+            default_value='false',
+            description='Use GPU for Lidar rays if true'
+        ),
         robot_state_publisher, 
         joystick,
         control_node,
         diff_drive_spawner,
         joint_broad_spawner,
-        # slam,
+        slam,
         amcl, 
         navigation,
         ekf_node,

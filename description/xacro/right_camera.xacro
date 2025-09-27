@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
 
+    <xacro:property name="visualize" value="$(arg show_camera)"/>
+
     <joint name="right_camera_joint" type="fixed">
         <parent link="chassis"/>
         <child link="right_camera_link"/>
@@ -23,7 +25,6 @@
         </visual>
     </link>
 
-
     <joint name="right_camera_optical_joint" type="fixed">
         <parent link="right_camera_link"/>
         <child link="right_camera_link_optical"/>
@@ -32,14 +33,12 @@
 
     <link name="right_camera_link_optical"></link>
 
-
-
     <gazebo reference="right_camera_link">
         <material>Gazebo/Black</material>
 
         <sensor name="right_camera" type="camera">
             <pose> 0 0 0 0 0 0 </pose>
-            <visualize>true</visualize>
+            <visualize>${visualize}</visualize>
             <update_rate>10</update_rate>
             <camera>
                 <horizontal_fov>1.089</horizontal_fov>
@@ -54,7 +53,6 @@
                 </clip>
             </camera>
             <plugin name="right_camera_controller" filename="libgazebo_ros_camera.so">
-                <!-- <robotNamespace>right_camera</robotNamespace> -->
                 <frame_name>right_camera_link_optical</frame_name>
             </plugin>
         </sensor>
