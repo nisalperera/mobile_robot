@@ -108,18 +108,6 @@ def generate_launch_description():
                         condition=IfCondition(use_slam)
     )
 
-    ekf_params_file = os.path.join(get_package_share_directory(package_name),'config','ekf.yaml')
-    ekf_node = Node(
-        package='robot_localization',
-        executable='ekf_node', 
-        name='ekf_filter_node',
-        output='screen',
-        parameters=[
-            ekf_params_file,  # Use full path to your ekf.yaml
-            {"use_sim_time": use_sim_time}
-        ]
-    )
-
     twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
     twist_mux = Node(
             package="twist_mux",
@@ -162,7 +150,6 @@ def generate_launch_description():
         slam,
         amcl, 
         navigation,
-        ekf_node,
         twist_mux,
     ]
     
