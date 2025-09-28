@@ -5,7 +5,7 @@ This repository provides resources and code for building and simulating an auton
 ## Features
 
 - Autonomous navigation with ROS
-- Stereo camera integration for 3D perception
+- Stereo camera integration for 3D perception (Ongoing)
 - LiDAR-based mapping and localization
 - Teleoperation (keyboard/joystick support)
 - Gazebo simulation environment
@@ -75,6 +75,15 @@ This repository provides resources and code for building and simulating an auton
 - `worlds`: Example worlds in Gazebo
 - `CMakeLists.txt` : Build instructions (CMake)
 - `README.md` : Project documentation
+
+## TODO
+
+- Update to new Gazebo version
+- Complete Stereo camera integration and obstacles detection using cameras
+- Integrate real hardware drivers for popular stereo cameras and LiDAR models
+- Improve teleoperation script compatibility (joystick, custom input devices)
+- Add demonstration videos and example runs in Gazebo
+- Expand documentation for source files and usage examples
 
 ## License
 
