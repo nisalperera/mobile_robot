@@ -96,3 +96,6 @@ Based on work by [joshnewans/my_bot](https://github.com/joshnewans/my_bot).
 ---
 
 For support or contributions, submit issues or pull requests on GitHub.
+
+### Note:
+This repo can be used with this [devcontainer](https://github.com/nisalperera/ros2-docker/tree/0.0.1-humble).
