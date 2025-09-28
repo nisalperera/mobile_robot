@@ -1,6 +1,0 @@
-ekf_filter_node:
-  ros__parameters:
-    frequency: 30.0
-    odom0: /odom
-    # imu0: /imu/data  # If available
-    publish_tf: true
