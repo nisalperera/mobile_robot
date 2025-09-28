@@ -13,7 +13,9 @@ This repository provides resources and code for building and simulating an auton
 ## Installation
 
 1. Clone this repository:
-    `git clone https://github.com/nisalperera/mobile_robot.git`
+    ```bash
+    git clone https://github.com/nisalperera/mobile_robot.git
+    ```
 
 2. Install ROS (recommended: ROS Noetic or ROS2 Humble) and Gazebo on your system (recommended to use Docker).
 3. Install required dependencies:
@@ -46,10 +48,14 @@ This repository provides resources and code for building and simulating an auton
 ## Usage
 
 - Launch the robot with:
-    `ros2 launch mobile_robot robot.launch.py`
+    ```bash
+    ros2 launch mobile_robot robot.launch.py
+    ```
 
 - Launch the Gazebo and RViz2 in a new terminal with:
-    `ros2 launch mobile_robot gz.launch.py`
+    ```bash
+    ros2 launch mobile_robot gz.launch.py
+    ```
 
 ## Gazebo
 <img src="images/gazebo.png" aling="center" alt="gazebo ss" />
