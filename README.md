@@ -32,7 +32,7 @@ This repository provides resources and code for building and simulating an auton
     - ros-${ROS_DISTRO}-navigation2
     - ros-${ROS_DISTRO}-nav2-bringup
 
-4. Build with colcon:
+4. Build with colcon:  
     `cd mobile_robot`  
     `colcon build --symlink-install`  
     `source install/setup.bash`  
