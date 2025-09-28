@@ -131,8 +131,8 @@ controller_server:
       # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
       acc_lim_x: 2.5
       acc_lim_y: 0.0
-      acc_lim_theta: 3.2
-      decel_lim_x: -2.5
+      acc_lim_theta: 1.5
+      decel_lim_x: -1.0
       decel_lim_y: 0.0
       decel_lim_theta: -3.2
       vx_samples: 20
