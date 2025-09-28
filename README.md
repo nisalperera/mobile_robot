@@ -33,9 +33,9 @@ This repository provides resources and code for building and simulating an auton
     - ros-${ROS_DISTRO}-nav2-bringup
 
 4. Build with colcon:
-    `cd mobile_robot`
-    `colcon build --symlink-install`
-    `source install/setup.bash`
+    `cd mobile_robot`  
+    `colcon build --symlink-install`  
+    `source install/setup.bash`  
 
     * Recommended to use `--symlink-install` argument to avoid building the package again and again when code is changed.
     * You must build the package if you add or remove a file even if you use `--symlink-install`
