@@ -11,7 +11,7 @@ def generate_launch_description():
     
     package_name = 'mobile_robot'
 
-    rviz_config_file = get_package_share_directory(package_name) + "/config/default.rviz"
+    rviz_config_file = get_package_share_directory(package_name) + "/rviz/default.rviz"
     rviz_node = Node(package='rviz2',
 					 executable='rviz2',
 					 name='rviz2',
