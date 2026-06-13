@@ -31,13 +31,13 @@
     Kitchen    : X=-6.0 to -3.5,  Y=-5.0 to -2.0  (2.5 x 3.0 m)
     Living Room: X=-3.5 to +3.5,  Y=-5.0 to -2.0  (7.0 x 3.0 m)
 
-  Doors (1.0m wide):
-    Front door : South wall,   X=-0.75 to +0.75
-    Bedroom 1  : South wall,   X=-5.5  to -4.5
-    Bedroom 2  : South wall,   X=+4.5  to +5.5 (approx)
-    Bedroom 3  : West wall,    Y=-2.0  to -1.0
-    Kitchen    : East wall,    Y=-4.0  to -3.0
-    Bathroom   : South wall,   X=-0.5  to +0.5
+  Doors (1.2 m wide interior, 1.5 m front door):
+    Front door : South wall,   X=-0.75 to +0.75  (1.5 m — unchanged)
+    Bedroom 1  : South wall,   X=-5.6  to -4.4   (1.2 m)
+    Bedroom 2  : South wall,   X=+4.4  to +5.6   (1.2 m)
+    Bedroom 3  : West wall,    Y=-2.1  to -0.9   (1.2 m)
+    Kitchen    : East wall,    Y=-4.1  to -2.9   (1.2 m)
+    Bathroom   : South wall,   X=-0.6  to +0.6   (1.2 m)
 
   Robot spawn: (0, -3.5, 0.0) — centre of living room, facing north.
   Wall height: 1.0m  |  Wall thickness: 0.15m
@@ -114,7 +114,7 @@
     </light>
 
     <!-- ===================================================================
-         FLOOR — warm wood-tone, friction-matched for diff-drive wheels
+         FLOOR
     ==================================================================== -->
     <model name="floor">
       <static>true</static>
@@ -136,33 +136,34 @@
     </model>
 
     <!-- ===================================================================
-         WALLS — all 1.0m high, 0.15m thick
+         WALLS — all 1.0 m high, 0.15 m thick
          Exterior: warm plaster  (0.85 0.82 0.76)
          Interior: off-white     (0.92 0.90 0.86)
     ==================================================================== -->
 
-    <!-- Exterior walls -->
+    <!-- ── Exterior walls ─────────────────────────────────────────────── -->
 
-    <!-- South exterior wall — split for 1.5m front door at X=0 -->
+    <!-- South exterior wall — split for 1.5 m front door at X=0
+         West segment: X=-6.0 to -0.75  length=5.25, centre=-3.375
+         East segment: X=+0.75 to +6.0  length=5.25, centre=+3.375 -->
     <model name="outer_south_w">
       <static>true</static>
-      <pose>-3.9375 -5 0.5 0 0 0</pose>
+      <pose>-3.375 -5 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>4.125 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>4.125 0.15 1.0</size></box></geometry><material><ambient>0.85 0.82 0.76 1</ambient><diffuse>0.85 0.82 0.76 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>5.25 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>5.25 0.15 1.0</size></box></geometry><material><ambient>0.85 0.82 0.76 1</ambient><diffuse>0.85 0.82 0.76 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
 
     <model name="outer_south_e">
       <static>true</static>
-      <pose>3.9375 -5 0.5 0 0 0</pose>
+      <pose>3.375 -5 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>4.125 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>4.125 0.15 1.0</size></box></geometry><material><ambient>0.85 0.82 0.76 1</ambient><diffuse>0.85 0.82 0.76 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>5.25 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>5.25 0.15 1.0</size></box></geometry><material><ambient>0.85 0.82 0.76 1</ambient><diffuse>0.85 0.82 0.76 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
-
-    <!-- Front door gap: X=-0.75 to +0.75 at Y=-5 (1.5m wide) -->
+    <!-- Front door gap: X=-0.75 to +0.75 (1.5 m) -->
 
     <!-- North exterior wall -->
     <model name="outer_north">
@@ -194,24 +195,29 @@
       </link>
     </model>
 
-    <!-- Interior walls -->
+    <!-- ── Interior walls ─────────────────────────────────────────────── -->
 
-    <!-- Bedroom 1 south wall (Y=+1.5), door gap X=-5.5 to -4.5 -->
+    <!--
+      BEDROOM 1 south wall (Y=+1.5)
+      Door gap: X=-5.6 to -4.4  (1.2 m, centre X=-5.0)
+      West segment: X=-6.0 to -5.6  length=0.4, centre=-5.8
+      East segment: X=-4.4 to -3.5  length=0.9, centre=-3.95
+    -->
     <model name="bedrm1_south_w">
       <static>true</static>
-      <pose>-5.75 1.5 0.5 0 0 0</pose>
+      <pose>-5.8 1.5 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>0.5 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>0.5 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.4 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.4 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
 
     <model name="bedrm1_south_e">
       <static>true</static>
-      <pose>-4.25 1.5 0.5 0 0 0</pose>
+      <pose>-3.95 1.5 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>1.5 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>1.5 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.9 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.9 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
 
@@ -245,44 +251,53 @@
       </link>
     </model>
 
-    <!-- Bathroom south wall (Y=+1.5), door gap X=-0.5 to +0.5 -->
+    <!--
+      BATHROOM south wall (Y=+1.5)
+      Door gap: X=-0.6 to +0.6  (1.2 m, centre X=0)
+      West segment: X=-1.0 to -0.6  length=0.4, centre=-0.8
+      East segment: X=+0.6 to +1.0  length=0.4, centre=+0.8
+    -->
     <model name="bath_south_w">
       <static>true</static>
-      <pose>-0.75 1.5 0.5 0 0 0</pose>
+      <pose>-0.8 1.5 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>0.5 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>0.5 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.4 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.4 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
 
     <model name="bath_south_e">
       <static>true</static>
-      <pose>0.75 1.5 0.5 0 0 0</pose>
+      <pose>0.8 1.5 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>0.5 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>0.5 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.4 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.4 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
 
-    <!-- Bedroom 2 south wall (Y=+1.5), door gap X=+4.5 to +5.5 -->
+    <!--
+      BEDROOM 2 south wall (Y=+1.5)
+      Door gap: X=+4.4 to +5.6  (1.2 m, centre X=+5.0)
+      West segment: X=+1.0 to +4.4  length=3.4, centre=+2.7
+      East segment: X=+5.6 to +6.0  length=0.4, centre=+5.8
+    -->
     <model name="bedrm2_south_w">
       <static>true</static>
-      <pose>2.25 1.5 0.5 0 0 0</pose>
+      <pose>2.7 1.5 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>2.5 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>2.5 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>3.4 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>3.4 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
 
     <model name="bedrm2_south_e">
       <static>true</static>
-      <pose>5.5 1.5 0.5 0 0 0</pose>
+      <pose>5.8 1.5 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>1.0 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>1.0 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.4 0.15 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.4 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
-    <!-- Bedroom 2 door gap: X=+4.5 to +5.5 (1.0m wide) at Y=+1.5 -->
 
     <!-- Bedroom 2 west wall (X=+3.5), Y=+1.5 to +5 -->
     <model name="bedrm2_west">
@@ -294,27 +309,31 @@
       </link>
     </model>
 
-    <!-- Bedroom 3 west wall (X=+3.5), Y=-5 to +1.5, door gap Y=-2 to -1 -->
+    <!--
+      BEDROOM 3 west wall (X=+3.5), Y=-5 to +1.5
+      Door gap: Y=-2.1 to -0.9  (1.2 m, centre Y=-1.5)
+      South segment: Y=-5.0 to -2.1  length=2.9, centre=-3.55
+      North segment: Y=-0.9 to +1.5  length=2.4, centre=+0.3
+    -->
     <model name="bedrm3_west_s">
       <static>true</static>
-      <pose>3.5 -3.5 0.5 0 0 0</pose>
+      <pose>3.5 -3.55 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>0.15 3.0 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>0.15 3.0 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.15 2.9 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.15 2.9 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
 
     <model name="bedrm3_west_n">
       <static>true</static>
-      <pose>3.5 0.25 0.5 0 0 0</pose>
+      <pose>3.5 0.3 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>0.15 2.5 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>0.15 2.5 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.15 2.4 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.15 2.4 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
-    <!-- Bedroom 3 door gap: Y=-2.0 to -1.0 (1.0m wide) at X=+3.5 -->
 
-    <!-- Kitchen south wall (Y=-2.0), X=-6 to -3.5 -->
+    <!-- Kitchen south wall (Y=-2.0), X=-6 to -3.5 — no door, full wall -->
     <model name="kitchen_south">
       <static>true</static>
       <pose>-4.75 -2.0 0.5 0 0 0</pose>
@@ -324,7 +343,8 @@
       </link>
     </model>
 
-    <!-- Hallway/living room divider (Y=-2.0), X=-2.0 to +6 -->
+    <!-- Hallway/living room divider (Y=-2.0), X=-2.0 to +6
+         Kitchen-living pass-through gap: X=-3.5 to -2.0 (1.5 m open arch) -->
     <model name="div_h_mid_e">
       <static>true</static>
       <pose>2.0 -2.0 0.5 0 0 0</pose>
@@ -333,27 +353,30 @@
         <visual name="vis"><geometry><box><size>8.0 0.15 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
-    <!-- Kitchen-living pass-through gap: X=-3.5 to -2.0 (1.5m open arch) -->
 
-    <!-- Kitchen east wall (X=-3.5), Y=-5 to -2, door gap Y=-4 to -3 -->
+    <!--
+      KITCHEN east wall (X=-3.5), Y=-5 to -2
+      Door gap: Y=-4.1 to -2.9  (1.2 m, centre Y=-3.5)
+      South segment: Y=-5.0 to -4.1  length=0.9, centre=-4.55
+      North segment: Y=-2.9 to -2.0  length=0.9, centre=-2.45
+    -->
     <model name="kitchen_east_s">
       <static>true</static>
-      <pose>-3.5 -4.5 0.5 0 0 0</pose>
+      <pose>-3.5 -4.55 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>0.15 1.0 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>0.15 1.0 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.15 0.9 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.15 0.9 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
 
     <model name="kitchen_east_n">
       <static>true</static>
-      <pose>-3.5 -2.75 0.5 0 0 0</pose>
+      <pose>-3.5 -2.45 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>0.15 1.5 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
-        <visual name="vis"><geometry><box><size>0.15 1.5 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
+        <collision name="col"><geometry><box><size>0.15 0.9 1.0</size></box></geometry><surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface></collision>
+        <visual name="vis"><geometry><box><size>0.15 0.9 1.0</size></box></geometry><material><ambient>0.92 0.90 0.86 1</ambient><diffuse>0.92 0.90 0.86 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual>
       </link>
     </model>
-    <!-- Kitchen door gap: Y=-4.0 to -3.0 (1.0m wide) at X=-3.5 -->
 
   </world>
 </sdf>
