@@ -1,27 +1,22 @@
 # ros_gz_bridge.yaml
 #
 # Declarative bridge configuration for ros_gz_bridge parameter_bridge.
-# Each entry defines one topic bridge between Ignition Gazebo and ROS2.
 #
 # direction:
-#   BIDIRECTIONAL   - both ways
-#   GZ_TO_ROS       - Ignition -> ROS only  (sensors, odometry, clock)
-#   ROS_TO_GZ       - ROS -> Ignition only  (cmd_vel)
+#   BIDIRECTIONAL  - both ways
+#   GZ_TO_ROS      - Ignition -> ROS only  (sensors, odometry, clock)
+#   ROS_TO_GZ      - ROS -> Ignition only  (cmd_vel)
 #
 # /tf is intentionally NOT bridged.
-# Ignition's internal DiffDrive plugin publishes namespaced TF frames
-# (mobile_robot/odom -> mobile_robot/base_footprint). Bridging those
-# overwrites the correct odom->base_footprint published by
-# diff_drive_controller (ros2_control), breaking the TF chain.
-# diff_drive_controller is the sole owner of the odom->base_footprint TF.
+# Ignition's DiffDrive plugin publishes namespaced TF frames
+# (mobile_robot/odom). Bridging those overwrites the correct
+# odom->base_footprint from diff_drive_controller (ros2_control).
 #
 # Lidar topic:
-#   Ignition gpu_lidar publishes on the full world-namespaced topic:
-#     /world/ignition_world/model/mobile_robot/link/laser_frame/sensor/laser/scan
-#   This is bridged and remapped to the ROS topic /scan which is what
-#   SLAM Toolbox and Nav2 subscribe to.
-#   NOTE: The world name 'ignition_world' must match the <world name=...>
-#   in ignition_world.world exactly.
+#   <topic>scan</topic> in lidar.xacro causes Ignition to publish on
+#   the global topic /scan (confirmed via: ign topic -l | grep scan).
+#   Bridge maps Ignition /scan -> ROS /scan.
+#   /scan/points (PointCloud2) is also bridged for optional use in RViz.
 
 - ros_topic_name: "/clock"
   gz_topic_name: "/clock"
@@ -41,11 +36,18 @@
   gz_type_name: "ignition.msgs.Odometry"
   direction: GZ_TO_ROS
 
-# Lidar: full Ignition namespaced topic -> /scan
+# Lidar 2D scan — Ignition publishes on /scan (global, confirmed)
 - ros_topic_name: "/scan"
-  gz_topic_name: "/world/ignition_world/model/mobile_robot/link/laser_frame/sensor/laser/scan"
+  gz_topic_name: "/scan"
   ros_type_name: "sensor_msgs/msg/LaserScan"
   gz_type_name: "ignition.msgs.LaserScan"
+  direction: GZ_TO_ROS
+
+# Lidar point cloud (optional — useful for RViz PointCloud2 display)
+- ros_topic_name: "/scan/points"
+  gz_topic_name: "/scan/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "ignition.msgs.PointCloudPacked"
   direction: GZ_TO_ROS
 
 - ros_topic_name: "/left_camera/image"
