@@ -1,17 +1,25 @@
 """gz.launch.py
 
-Ignition Gazebo hardware launcher — simulation only.
+Ignition Gazebo simulation launcher.
 
-Key fix: Ignition Fortress gpu_lidar sets header.frame_id to its
-fully-namespaced internal path 'mobile_robot/base_footprint/laser'.
-The ROS TF tree only knows 'laser_frame' (robot_state_publisher).
-SLAM Toolbox and RViz drop every /scan message because the frame_id
-never resolves — causing the continuous 'queue is full' warning and
-no map ever being built.
+Ignition Fortress sensor frame_id namespacing issue:
+  All sensors get header.frame_id set to their fully-namespaced internal
+  path, e.g.:
+    lidar  -> 'mobile_robot/base_footprint/laser'
+    cameras -> 'mobile_robot/base_footprint/left_camera'
+                'mobile_robot/base_footprint/right_camera'
 
-Fix: use topic_tools transform to subscribe /scan, rewrite
-header.frame_id to 'laser_frame', and republish on /scan_fixed.
-SLAM Toolbox is configured to subscribe /scan_fixed.
+  The ROS TF tree only knows the URDF link names:
+    'laser_frame', 'left_camera_link_optical', 'right_camera_link_optical'
+
+  RViz and SLAM Toolbox drop every message because the frame_id never
+  resolves in TF.
+
+Fix: topic_tools transform nodes rewrite frame_id on each sensor topic
+before any ROS node sees it:
+  /scan          -> /scan_fixed          (frame_id: laser_frame)
+  /left_camera/image  -> /left_camera/image_fixed  (frame_id: left_camera_link_optical)
+  /right_camera/image -> /right_camera/image_fixed (frame_id: right_camera_link_optical)
 """
 
 import logging
@@ -113,20 +121,21 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # -------------------------------------------------------------------------
-    # Scan frame_id fixer
+    # =========================================================================
+    # Frame-id fixers
     #
-    # Ignition Fortress gpu_lidar sets header.frame_id to the internal
-    # namespaced path 'mobile_robot/base_footprint/laser'. The ROS TF tree
-    # only has 'laser_frame'. SLAM Toolbox drops every message — no map.
+    # Ignition Fortress sets header.frame_id to the fully-namespaced internal
+    # sensor path for every sensor. None of these exist in the ROS TF tree.
+    # Each fixer subscribes the raw bridged topic, rewrites frame_id to the
+    # correct URDF link name, and republishes on a _fixed topic.
     #
-    # topic_tools transform:
-    #   - input  topic : /scan       (sensor_msgs/msg/LaserScan)
-    #   - output topic : /scan_fixed (sensor_msgs/msg/LaserScan)
-    #   - expression   : rewrites header.frame_id to 'laser_frame'
-    #
-    # SLAM Toolbox subscribes /scan_fixed (see mapper_params_online_async.yaml).
-    # -------------------------------------------------------------------------
+    # Downstream consumers (RViz, SLAM Toolbox, perception nodes) must
+    # subscribe the _fixed topics, NOT the raw bridge topics.
+    # =========================================================================
+
+    # --- Lidar ---------------------------------------------------------------
+    # Raw frame_id:  'mobile_robot/base_footprint/laser'
+    # Fixed frame_id: 'laser_frame'
     scan_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -135,7 +144,6 @@ def generate_launch_description():
             '/scan',
             '/scan_fixed',
             'sensor_msgs/msg/LaserScan',
-            # Python expression: copy message, overwrite frame_id
             "sensor_msgs.msg.LaserScan("
             "header=std_msgs.msg.Header("
             "stamp=m.header.stamp, "
@@ -155,6 +163,63 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
+    # --- Left camera ---------------------------------------------------------
+    # Raw frame_id:  'mobile_robot/base_footprint/left_camera'
+    # Fixed frame_id: 'left_camera_link_optical'
+    # Consumers: RViz Image display, any vision pipeline
+    left_camera_frame_fixer = Node(
+        package='topic_tools',
+        executable='transform',
+        name='left_camera_frame_fixer',
+        arguments=[
+            '/left_camera/image',
+            '/left_camera/image_fixed',
+            'sensor_msgs/msg/Image',
+            "sensor_msgs.msg.Image("
+            "header=std_msgs.msg.Header("
+            "stamp=m.header.stamp, "
+            "frame_id='left_camera_link_optical'), "
+            "height=m.height, "
+            "width=m.width, "
+            "encoding=m.encoding, "
+            "is_bigendian=m.is_bigendian, "
+            "step=m.step, "
+            "data=m.data)",
+            '--import', 'sensor_msgs', 'std_msgs',
+        ],
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
+
+    # --- Right camera --------------------------------------------------------
+    # Raw frame_id:  'mobile_robot/base_footprint/right_camera'
+    # Fixed frame_id: 'right_camera_link_optical'
+    # Consumers: RViz Image display, any vision pipeline
+    right_camera_frame_fixer = Node(
+        package='topic_tools',
+        executable='transform',
+        name='right_camera_frame_fixer',
+        arguments=[
+            '/right_camera/image',
+            '/right_camera/image_fixed',
+            'sensor_msgs/msg/Image',
+            "sensor_msgs.msg.Image("
+            "header=std_msgs.msg.Header("
+            "stamp=m.header.stamp, "
+            "frame_id='right_camera_link_optical'), "
+            "height=m.height, "
+            "width=m.width, "
+            "encoding=m.encoding, "
+            "is_bigendian=m.is_bigendian, "
+            "step=m.step, "
+            "data=m.data)",
+            '--import', 'sensor_msgs', 'std_msgs',
+        ],
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
+
+    # -------------------------------------------------------------------------
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
@@ -182,5 +247,7 @@ def generate_launch_description():
         spawn_entity,
         bridge,
         scan_frame_fixer,
+        left_camera_frame_fixer,
+        right_camera_frame_fixer,
         delayed_spawners,
     ])
