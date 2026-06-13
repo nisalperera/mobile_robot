@@ -134,7 +134,7 @@ def generate_launch_description():
             '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
             f'/model/{package_name}/cmd_vel@geometry_msgs/msg/Twist@ignition.msgs.Twist',
             f'/model/{package_name}/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
-            '/tf@tf2_msgs/msg/TFMessage@ignition.msgs.Pose_V',
+            '/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V',
             '/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
             '/left_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',

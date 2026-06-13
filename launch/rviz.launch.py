@@ -16,7 +16,6 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
-    launch_robot_description = LaunchConfiguration('robot_description')
 
     rviz_config = LaunchConfiguration('rviz_config')
     rviz_config_file = get_package_share_directory(package_name) + f"/rviz/{rviz_config}.rviz"
@@ -28,20 +27,20 @@ def generate_launch_description():
                 )
     
     xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
-    robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='both',
-        parameters=[{
-            'robot_description': ParameterValue(Command([
-                'xacro', ' ', xacro_file,
-                ' use_ros2_control:=', use_ros2_control,
-                ' sim_mode:=', use_sim_time,
-            ]), value_type=str),
-            'use_sim_time': use_sim_time,
-        }],
-    )
+    # robot_state_publisher = Node(
+    #     package='robot_state_publisher',
+    #     executable='robot_state_publisher',
+    #     name='robot_state_publisher',
+    #     output='both',
+    #     parameters=[{
+    #         'robot_description': ParameterValue(Command([
+    #             'xacro', ' ', xacro_file,
+    #             ' use_ros2_control:=', use_ros2_control,
+    #             ' sim_mode:=', use_sim_time,
+    #         ]), value_type=str),
+    #         'use_sim_time': use_sim_time,
+    #     }],
+    # )
 
     launch_descriptions = LaunchDescription([
             DeclareLaunchArgument(
@@ -60,8 +59,6 @@ def generate_launch_description():
                 'robot_description',
                 default_value='true',
                 description='Launch the robot_description node if true'),
-            # OpaqueFunction(function=_launch_robot_description),
-            robot_state_publisher,
             rviz_node,
         ])
 

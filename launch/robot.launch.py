@@ -35,8 +35,7 @@ def generate_launch_description():
                 ' use_ros2_control:=', use_ros2_control,
                 ' sim_mode:=', use_sim_time
             ]), value_type=str)
-        }],
-        condition=IfCondition(launch_robot_description)
+        }]
     )
 
     
