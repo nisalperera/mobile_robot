@@ -53,10 +53,10 @@
                     <far>5.0</far>
                 </clip>
             </camera>
-            <plugin name="left_camera_controller" filename="libgazebo_ros_camera.so">
-                <!-- <robotNamespace>left_camera</robotNamespace> -->
+            <!-- <plugin name="ignition::gazebo::systems::Sensors" filename="libignition-gazebo-sensors-system.so">
                 <frame_name>left_camera_link_optical</frame_name>
-            </plugin>
+                <render_engine>ogre</render_engine>
+            </plugin> -->
         </sensor>
     </gazebo>
 
