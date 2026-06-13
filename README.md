@@ -51,14 +51,9 @@ This repository provides resources and code for building and simulating an auton
 
 ## Usage
 
-- Launch the robot with:
+- Launch the simulation in a terminal with:
     ```bash
-    ros2 launch mobile_robot robot.launch.py
-    ```
-
-- Launch the Gazebo and RViz2 in a new terminal with:
-    ```bash
-    ros2 launch mobile_robot gz.launch.py
+    ros2 launch mobile_robot mapping.launch.py world:=house_world
     ```
 
 ## Gazebo
@@ -75,8 +70,8 @@ This repository provides resources and code for building and simulating an auton
 - `description/` : XACRO file for robot description
 - `launch/` : ROS launch files for simulations
 - `config/` : Configuration and parameter files
-- `maps`: A base map generated from [obstacles.world](worlds/obstacles.world)
-- `worlds`: Example worlds in Gazebo
+- `maps/`: A map generated using SLAM Toolbox for testing navigation
+- `worlds/`: Example worlds in Gazebo
 - `CMakeLists.txt` : Build instructions (CMake)
 - `README.md` : Project documentation
 
