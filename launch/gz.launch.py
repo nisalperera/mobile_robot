@@ -82,32 +82,16 @@ def generate_launch_description():
 
     # -------------------------------------------------------------------------
     # Topic bridge: Ignition <-> ROS2
-    #
-    # Format: 'gz_topic@ros_msg_type@gz_msg_type'
-    # Prefix with [ for GZ->ROS only, ] for ROS->GZ only, @ for bidirectional.
-    #
-    # --config-file is NOT available in the ros_gz_bridge version shipped
-    # with ROS2 Humble — it was added in later releases. Using it causes
-    # parameter_bridge to crash immediately on startup.
-    #
-    # /tf is intentionally excluded — see TF ownership notes above.
     # -------------------------------------------------------------------------
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
         arguments=[
-            # Clock: Ignition -> ROS
             '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
-            # Drive command: ROS -> Ignition
             '/model/mobile_robot/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist',
-            # Odometry: Ignition -> ROS, remapped in remappings below
             '/model/mobile_robot/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
-            # Lidar 2D scan: Ignition -> ROS
-            # Topic confirmed via: ign topic -l | grep scan -> /scan
             '/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
-            # Lidar point cloud: Ignition -> ROS
             '/scan/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
-            # Cameras: Ignition -> ROS
             '/left_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
             '/right_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
@@ -119,6 +103,40 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+    )
+
+    # -------------------------------------------------------------------------
+    # frame_id fixer for /scan
+    #
+    # Ignition Fortress gpu_lidar sets header.frame_id to its internal
+    # namespaced path: 'mobile_robot/base_footprint/laser'
+    # The ROS TF tree only knows 'laser_frame' (from robot_state_publisher).
+    # SLAM Toolbox and RViz drop every message because the frame never
+    # matches, producing the 'queue is full' error loop.
+    #
+    # This node rewrites frame_id to 'laser_frame' on every incoming scan.
+    # SLAM Toolbox and RViz must subscribe to /scan_fixed, not /scan.
+    # -------------------------------------------------------------------------
+    scan_frame_fixer = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        name='scan_frame_fixer',
+        # Re-use parameter_bridge just to relay; frame_id is fixed below
+        # via a small Python relay node instead
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen',
+    )
+
+    # Python relay: rewrites frame_id and republishes on /scan_fixed
+    scan_relay = Node(
+        package='mobile_robot',
+        executable='scan_frame_fixer',
+        name='scan_frame_fixer',
+        parameters=[
+            {'use_sim_time': use_sim_time},
+            {'target_frame': 'laser_frame'},
+        ],
+        output='screen',
     )
 
     joint_state_broadcaster_spawner = Node(
@@ -147,5 +165,6 @@ def generate_launch_description():
         OpaqueFunction(function=launch_gazebo),
         spawn_entity,
         bridge,
+        scan_relay,
         delayed_spawners,
     ])
