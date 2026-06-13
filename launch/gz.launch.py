@@ -13,9 +13,16 @@ NOT responsible for:
   - RViz                   (owned by the top-level launch file)
   - SLAM / AMCL / Nav2     (owned by the top-level launch file)
 
-This clean separation prevents duplicate RSP nodes that corrupt /tf and
-/robot_description when gz.launch.py is included by mapping.launch.py or
-localization_nav.launch.py.
+TF ownership:
+  odom → base_footprint      → diff_drive_controller (ros2_control, via gz_ros2_control)
+  base_footprint → base_link → robot_state_publisher (fixed joint)
+  base_link → wheels/sensors → robot_state_publisher
+
+  The /tf bridge from Ignition is intentionally REMOVED. Ignition's built-in
+  DiffDrive system plugin publishes TF with namespaced frame IDs
+  (e.g. mobile_robot/odom → mobile_robot/base_footprint). If those are
+  forwarded into ROS they clobber the correct odom→base_footprint transform
+  that diff_drive_controller already publishes, breaking the RViz TF tree.
 """
 
 import os
@@ -115,19 +122,19 @@ def generate_launch_description():
     #   topic@ros_type[ign_type  → Ignition → ROS only
     #   topic@ros_type]ign_type  → ROS → Ignition only
     #
-    # /tf MUST be unidirectional (GZ→ROS only, using '[').
-    # If made bidirectional ('@@'), a TF loop forms:
-    #   Gazebo publishes odom→base_footprint on /tf
-    #   → bridged into ROS
-    #   → RSP publishes base_footprint→base_link on /tf
-    #   → bridged BACK into Gazebo
-    #   → Gazebo re-emits a conflicting base_footprint transform
-    #   → RViz TF tree breaks: all links lose transform to base_footprint
+    # NOTE: /tf is intentionally NOT bridged here.
     #
-    # The correct TF chain is:
-    #   odom → base_footprint   (published by diff_drive_controller via GZ /tf bridge)
-    #   base_footprint → base_link  (published by robot_state_publisher, fixed joint)
-    #   base_link → chassis/wheels/sensors  (published by robot_state_publisher)
+    # Ignition's DiffDrive system plugin publishes TF with namespaced frame IDs
+    # (mobile_robot/odom → mobile_robot/base_footprint). Forwarding those into
+    # ROS would overwrite the correct odom→base_footprint transform that
+    # diff_drive_controller (ros2_control) publishes, breaking the TF chain
+    # and making the robot appear frozen in RViz even though it moves in Gazebo.
+    #
+    # diff_drive_controller is solely responsible for publishing:
+    #   odom → base_footprint  (via publish_odom_tf: true in controllers.yaml)
+    #
+    # robot_state_publisher is solely responsible for publishing:
+    #   base_footprint → base_link → chassis / wheels / sensors
     # -------------------------------------------------------------------------
     bridge = Node(
         package='ros_gz_bridge',
@@ -136,11 +143,6 @@ def generate_launch_description():
             '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
             f'/model/{package_name}/cmd_vel@geometry_msgs/msg/Twist@ignition.msgs.Twist',
             f'/model/{package_name}/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
-            # GZ→ROS ONLY: prevents the TF loop that breaks RViz transforms.
-            # Gazebo's diff_drive_controller publishes odom→base_footprint here.
-            # RSP's joint transforms (base_footprint→base_link etc.) are published
-            # directly on the ROS /tf topic and do NOT need to go back into Gazebo.
-            '/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V',
             '/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
             '/left_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
