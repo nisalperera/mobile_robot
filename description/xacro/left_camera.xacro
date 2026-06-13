@@ -23,7 +23,6 @@
         </visual>
     </link>
 
-
     <joint name="left_camera_optical_joint" type="fixed">
         <parent link="left_camera_link"/>
         <child link="left_camera_link_optical"/>
@@ -31,8 +30,6 @@
     </joint>
 
     <link name="left_camera_link_optical"></link>
-
-
 
     <gazebo reference="left_camera_link">
         <material>Gazebo/Black</material>
@@ -53,10 +50,22 @@
                     <far>5.0</far>
                 </clip>
             </camera>
-            <!-- <plugin name="ignition::gazebo::systems::Sensors" filename="libignition-gazebo-sensors-system.so">
-                <frame_name>left_camera_link_optical</frame_name>
-                <render_engine>ogre</render_engine>
-            </plugin> -->
+            <!--
+                Ignition Fortress camera publishing:
+                - The global Sensors system plugin is loaded at world level
+                  (ignition_world.world). It activates all sensors.
+                - <topic> sets the Ignition topic name that ros_gz_bridge
+                  maps to the ROS topic /left_camera/image.
+                - <frame_name> sets header.frame_id on published messages.
+                  Must be the optical frame so RViz image panels and
+                  camera_info align correctly with the TF tree.
+            -->
+            <plugin
+                name="ignition::gazebo::systems::CameraInfoPublisher"
+                filename="libignition-gazebo-sensors-system.so">
+            </plugin>
+            <topic>left_camera/image</topic>
+            <frame_name>left_camera_link_optical</frame_name>
         </sensor>
     </gazebo>
 
