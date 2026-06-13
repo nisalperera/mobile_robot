@@ -17,9 +17,14 @@ Ignition Fortress sensor frame_id namespacing issue:
 
 Fix: topic_tools transform nodes rewrite frame_id on each sensor topic
 before any ROS node sees it:
-  /scan               -> /scan_fixed             (frame_id: laser_frame)
+  /scan               -> /scan_fixed               (frame_id: laser_frame)
   /left_camera/image  -> /left_camera/image_fixed  (frame_id: left_camera_link_optical)
   /right_camera/image -> /right_camera/image_fixed (frame_id: right_camera_link_optical)
+
+The camera frame fixers are delayed by 3 s (TimerAction) so that
+ros_gz_bridge has time to connect to Ignition and begin publishing
+before topic_tools tries to subscribe. Without the delay the transform
+nodes exit immediately with 'wrong input topic'.
 
 World selection:
   Pass world:=<name>  to load a different world at runtime.
@@ -177,9 +182,17 @@ def generate_launch_description():
     #
     # Downstream consumers (RViz, SLAM Toolbox, perception nodes) must
     # subscribe the _fixed topics, NOT the raw bridge topics.
+    #
+    # The lidar fixer starts immediately — /scan is available as soon as
+    # the bridge connects.
+    #
+    # The camera fixers are delayed by 3 s so ros_gz_bridge has time to
+    # connect to Ignition and start publishing before topic_tools tries
+    # to subscribe. Without the delay topic_tools exits with:
+    #   "wrong input topic" / no publisher found.
     # =========================================================================
 
-    # --- Lidar ---------------------------------------------------------------
+    # --- Lidar (no delay needed) ---------------------------------------------
     scan_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -207,7 +220,7 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # --- Left camera ---------------------------------------------------------
+    # --- Left camera (delayed 3 s) -------------------------------------------
     left_camera_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -232,7 +245,7 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # --- Right camera --------------------------------------------------------
+    # --- Right camera (delayed 3 s) ------------------------------------------
     right_camera_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -255,6 +268,13 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+    )
+
+    # Camera fixers share a single 3-second delay so they start together
+    # after the bridge is ready.
+    delayed_camera_fixers = TimerAction(
+        period=3.0,
+        actions=[left_camera_frame_fixer, right_camera_frame_fixer],
     )
 
     # -------------------------------------------------------------------------
@@ -308,7 +328,6 @@ def generate_launch_description():
         spawn_entity,
         bridge,
         scan_frame_fixer,
-        left_camera_frame_fixer,
-        right_camera_frame_fixer,
+        delayed_camera_fixers,
         delayed_spawners,
     ])
