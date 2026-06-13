@@ -20,7 +20,16 @@ diff_drive_controller:
     # publish_rate can stay lower — this is only the odom/tf publish rate,
     # not the command execution rate.
     publish_rate: 50.0
-    base_frame_id: base_link
+
+    # IMPORTANT: Must be 'base_footprint', NOT 'base_link'.
+    # The URDF defines base_footprint as the root link, with base_link as
+    # its child via a fixed joint. The diff_drive_controller publishes the
+    # odom→base_frame_id transform. If this were 'base_link', the controller
+    # would publish odom→base_link, but RSP also publishes base_footprint→base_link
+    # (fixed joint), making base_link have TWO parents — a TF tree violation.
+    # Correct chain: odom → base_footprint (controller) → base_link (RSP fixed joint)
+    base_frame_id: base_footprint
+
     left_wheel_names: ['front_left_wheel_joint', 'rear_left_wheel_joint']
     right_wheel_names: ['front_right_wheel_joint', 'rear_right_wheel_joint']
     wheels_per_side: 2

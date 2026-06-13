@@ -115,9 +115,19 @@ def generate_launch_description():
     #   topic@ros_type[ign_type  → Ignition → ROS only
     #   topic@ros_type]ign_type  → ROS → Ignition only
     #
-    # /tf must be bidirectional (@) so both Ignition-published TFs
-    # (odom→base_footprint from diff_drive) AND RSP-published TFs
-    # (base_link→wheels etc.) are visible on the same /tf topic.
+    # /tf MUST be unidirectional (GZ→ROS only, using '[').
+    # If made bidirectional ('@@'), a TF loop forms:
+    #   Gazebo publishes odom→base_footprint on /tf
+    #   → bridged into ROS
+    #   → RSP publishes base_footprint→base_link on /tf
+    #   → bridged BACK into Gazebo
+    #   → Gazebo re-emits a conflicting base_footprint transform
+    #   → RViz TF tree breaks: all links lose transform to base_footprint
+    #
+    # The correct TF chain is:
+    #   odom → base_footprint   (published by diff_drive_controller via GZ /tf bridge)
+    #   base_footprint → base_link  (published by robot_state_publisher, fixed joint)
+    #   base_link → chassis/wheels/sensors  (published by robot_state_publisher)
     # -------------------------------------------------------------------------
     bridge = Node(
         package='ros_gz_bridge',
@@ -126,7 +136,11 @@ def generate_launch_description():
             '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
             f'/model/{package_name}/cmd_vel@geometry_msgs/msg/Twist@ignition.msgs.Twist',
             f'/model/{package_name}/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
-            '/tf@tf2_msgs/msg/TFMessage@ignition.msgs.Pose_V',
+            # GZ→ROS ONLY: prevents the TF loop that breaks RViz transforms.
+            # Gazebo's diff_drive_controller publishes odom→base_footprint here.
+            # RSP's joint transforms (base_footprint→base_link etc.) are published
+            # directly on the ROS /tf topic and do NOT need to go back into Gazebo.
+            '/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V',
             '/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
             '/left_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
