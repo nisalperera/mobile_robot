@@ -7,11 +7,12 @@
     <xacro:include filename="$(find mobile_robot)/description/xacro/robot_core.xacro" />
 
     <!-- Control inclusion based on use_ros2_control argument -->
-    <xacro:if value="${'$(arg use_ros2_control)' == 'true'}">
+
+    <xacro:if value="$(arg use_ros2_control)">
         <xacro:include filename="$(find mobile_robot)/description/xacro/ros2_control.xacro" />
     </xacro:if>
-    <xacro:if value="${'$(arg use_ros2_control)' == 'false'}">
+    <xacro:unless value="$(arg use_ros2_control)">
         <xacro:include filename="$(find mobile_robot)/description/xacro/gazebo_control.xacro" />
-    </xacro:if>
+    </xacro:unless>
 
 </robot>

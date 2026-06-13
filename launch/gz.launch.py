@@ -3,6 +3,7 @@ import logging
 
 from ament_index_python.packages import get_package_share_directory
 
+from launch_ros.parameter_descriptions import ParameterValue
 from launch import LaunchDescription
 from launch.actions import (
     IncludeLaunchDescription,
@@ -88,14 +89,14 @@ def generate_launch_description():
         name='robot_state_publisher',
         output='both',
         parameters=[{
-            'robot_description': Command([
+            'robot_description': ParameterValue(Command([
                 'xacro', ' ', xacro_file,
                 ' use_ros2_control:=', use_ros2_control,
-                ' sim_mode:=', use_sim_time,
-            ]),
-            'use_sim_time': use_sim_time,
+                ' sim_mode:=', use_sim_time
+            ]), value_type=str)
         }],
     )
+
 
     rviz = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -104,7 +105,6 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': use_sim_time,
             'use_ros2_control': use_ros2_control,
-            # robot_description=false so rviz.launch.py does NOT spawn a second RSP
             'robot_description': 'false',
         }.items(),
     )

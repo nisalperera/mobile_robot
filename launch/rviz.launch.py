@@ -4,35 +4,11 @@ from launch_ros.actions import Node
 from launch import LaunchDescription
 from launch.conditions import IfCondition
 from ament_index_python.packages import get_package_share_directory
+from launch_ros.parameter_descriptions import ParameterValue
 
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, Command
 
-
-# def _launch_robot_description(context, *args, **kwargs):
-#     package_name = 'mobile_robot'
-#     use_ros2_control = LaunchConfiguration('use_ros2_control')
-#     use_sim_time = LaunchConfiguration('use_sim_time')
-
-#     launch_robot_description = LaunchConfiguration('robot_description')
-#     xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
-
-#     nodes = []
-
-#     if launch_robot_description.perform(context).lower() == 'true':
-#         # Robot State Publisher 
-#         robot_state_publisher = Node(
-#             package='robot_state_publisher',
-#             executable='robot_state_publisher',
-#             name='robot_state_publisher',
-#             output='both',
-#             parameters=[{
-#                 'robot_description': Command(['xacro', ' ', xacro_file, ' use_ros2_control:=', use_ros2_control, ' sim_mode:=', use_sim_time])           
-#                 }]
-#         )
-#         nodes.append(robot_state_publisher)
-
-#     return nodes
 
 def generate_launch_description():
     
@@ -58,9 +34,13 @@ def generate_launch_description():
         name='robot_state_publisher',
         output='both',
         parameters=[{
-            'robot_description': Command(['xacro', ' ', xacro_file, ' use_ros2_control:=', use_ros2_control, ' sim_mode:=', use_sim_time])           
-            }],
-        condition=IfCondition(launch_robot_description)
+            'robot_description': ParameterValue(Command([
+                'xacro', ' ', xacro_file,
+                ' use_ros2_control:=', use_ros2_control,
+                ' sim_mode:=', use_sim_time,
+            ]), value_type=str),
+            'use_sim_time': use_sim_time,
+        }],
     )
 
     launch_descriptions = LaunchDescription([
