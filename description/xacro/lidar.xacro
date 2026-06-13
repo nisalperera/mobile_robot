@@ -32,29 +32,33 @@
     </link>
 
     <!--
-        Ignition Fortress lidar sensor.
+        Ignition Fortress gpu_lidar sensor.
 
-        Use sensor type="gpu_lidar" (not "ray").
-        "ray" is the Gazebo Classic type and does NOT work in Ignition.
+        sensor type="gpu_lidar" is the correct Ignition type (NOT "ray").
 
-        The plugin that drives the sensor is libignition-gazebo-gpu-rays-system.so
-        loaded via the <sensor> block. The world must also load the
-        Sensors world-level system plugin (libignition-gazebo-sensors-system.so)
-        in the .world file — without it every sensor in the world is silent.
+        NO <plugin> block inside <sensor>. The world-level Sensors plugin
+        (libignition-gazebo-sensors-system.so in ignition_world.world)
+        automatically drives ALL sensor types including gpu_lidar.
 
-        Topic remapping:
-          Ignition publishes on:  /world/<world>/model/mobile_robot/link/laser_frame/sensor/laser/scan
-          The gz.launch.py bridge maps this to ROS topic: /scan
-          SLAM Toolbox subscribes to: /scan
+        libignition-gazebo-gpu-rays-system.so does NOT exist in Ignition
+        Fortress — specifying it causes:
+          [Err] Failed to load system plugin: couldn't find shared library
+
+        <topic> sets the short Ignition topic name. The full path bridged
+        to ROS /scan by ros_gz_bridge.yaml is:
+          /world/ignition_world/model/mobile_robot/link/laser_frame/sensor/laser/scan
     -->
     <gazebo reference="laser_frame">
         <material>Gazebo/Red</material>
 
         <sensor name="laser" type="gpu_lidar">
             <pose>0 0 0 0 0 0</pose>
-            <visualize>false</visualize>
             <update_rate>10</update_rate>
-            <lidar>
+            <always_on>1</always_on>
+            <visualize>false</visualize>
+            <topic>scan</topic>
+            <frame_id>laser_frame</frame_id>
+            <ray>
                 <scan>
                     <horizontal>
                         <samples>360</samples>
@@ -68,21 +72,7 @@
                     <max>12.0</max>
                     <resolution>0.01</resolution>
                 </range>
-            </lidar>
-            <!--
-                topic: the short name published inside Ignition.
-                The full Ignition topic will be:
-                  /world/<world_name>/model/mobile_robot/link/laser_frame/sensor/laser/scan
-                gz.launch.py bridges this to the ROS topic /scan.
-                frame_id must match the URDF link name so LaserScan
-                messages carry the correct TF frame.
-            -->
-            <plugin name="ignition::gazebo::systems::GpuLidar"
-                    filename="libignition-gazebo-gpu-rays-system.so">
-                <topic>scan</topic>
-                <frame_id>laser_frame</frame_id>
-                <output_type>sensor_msgs/LaserScan</output_type>
-            </plugin>
+            </ray>
         </sensor>
     </gazebo>
 
