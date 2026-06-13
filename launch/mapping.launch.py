@@ -45,11 +45,11 @@ def generate_launch_description():
     pkg_share = get_package_share_directory(package_name)
 
     # ── Launch arguments ────────────────────────────────────────────────────
-    sim_mode         = LaunchConfiguration('sim_mode')
-    use_sim_time     = LaunchConfiguration('use_sim_time')
+    sim_mode = LaunchConfiguration('sim_mode')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
-    headless         = LaunchConfiguration('headless')
-    world            = LaunchConfiguration('world')
+    headless = LaunchConfiguration('headless')
+    world = LaunchConfiguration('world')
 
     # ── Robot State Publisher (always runs — sim AND real robot) ─────────────
     xacro_file = os.path.join(pkg_share, 'description', 'robot.urdf.xacro')

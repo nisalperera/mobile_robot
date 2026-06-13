@@ -20,16 +20,16 @@ def generate_launch_description():
     # -------------------------------------------------------------------------
     # Launch arguments
     # -------------------------------------------------------------------------
-    use_sim_time   = LaunchConfiguration('use_sim_time')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
-    use_slam       = LaunchConfiguration('use_slam')
+    use_slam = LaunchConfiguration('use_slam')
     # sim_mode is now an EXPLICIT argument, decoupled from use_sim_time.
     # On the real robot pass sim_mode:=false use_sim_time:=false.
     # In simulation (default) both are true.
-    sim_mode       = LaunchConfiguration('sim_mode')
+    sim_mode = LaunchConfiguration('sim_mode')
 
-    pkg_share    = get_package_share_directory(package_name)
-    xacro_file   = pkg_share + '/description/robot.urdf.xacro'
+    pkg_share = get_package_share_directory(package_name)
+    xacro_file = pkg_share + '/description/robot.urdf.xacro'
 
     # -------------------------------------------------------------------------
     # Robot State Publisher
@@ -137,7 +137,7 @@ def generate_launch_description():
     # see Issue 3: SLAM and AMCL should be mutually exclusive in a future fix)
     # -------------------------------------------------------------------------
     amcl_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
-    map_file         = os.path.join(pkg_share, 'maps', 'map_save.yaml')
+    map_file = os.path.join(pkg_share, 'maps', 'map_save.yaml')
 
     amcl = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(

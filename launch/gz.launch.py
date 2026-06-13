@@ -97,11 +97,11 @@ def _resolve_world_path(context):
 
 def launch_gazebo(context, *args, **kwargs):
     world_file = _resolve_world_path(context)
-    headless   = LaunchConfiguration('headless').perform(context).lower() == 'true'
-    gz_args    = f'-r -s --force-version 6 {world_file}' if headless \
+    headless = LaunchConfiguration('headless').perform(context).lower() == 'true'
+    gz_args = f'-r -s --force-version 6 {world_file}' if headless \
                  else f'-r --force-version 6 {world_file}'
 
-    existing_plugin_path   = os.environ.get('IGN_GAZEBO_SYSTEM_PLUGIN_PATH', '')
+    existing_plugin_path = os.environ.get('IGN_GAZEBO_SYSTEM_PLUGIN_PATH', '')
     existing_resource_path = os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')
 
     plugin_paths = ':'.join(filter(None, [
@@ -128,7 +128,7 @@ def launch_gazebo(context, *args, **kwargs):
 def generate_launch_description():
     package_name = 'mobile_robot'
 
-    use_sim_time     = LaunchConfiguration('use_sim_time')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
 
     spawn_entity = Node(

@@ -16,9 +16,9 @@ def generate_launch_description():
 
     package_name = 'mobile_robot'
 
-    use_sim_time     = LaunchConfiguration('use_sim_time')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
-    rviz_config      = LaunchConfiguration('rviz_config')
+    rviz_config = LaunchConfiguration('rviz_config')
 
     # -------------------------------------------------------------------------
     # RViz config path
