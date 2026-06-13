@@ -1,13 +1,23 @@
 """gz.launch.py
 
 Ignition Gazebo hardware launcher — simulation only.
+
+Key fix: Ignition Fortress gpu_lidar sets header.frame_id to its
+fully-namespaced internal path 'mobile_robot/base_footprint/laser'.
+The ROS TF tree only knows 'laser_frame' (robot_state_publisher).
+SLAM Toolbox and RViz drop every /scan message because the frame_id
+never resolves — causing the continuous 'queue is full' warning and
+no map ever being built.
+
+Fix: use topic_tools transform to subscribe /scan, rewrite
+header.frame_id to 'laser_frame', and republish on /scan_fixed.
+SLAM Toolbox is configured to subscribe /scan_fixed.
 """
 
-import os
 import logging
+import os
 
 from ament_index_python.packages import get_package_share_directory
-
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -32,7 +42,6 @@ def log_args(context, *args, **kwargs):
 
 def launch_gazebo(context, *args, **kwargs):
     pkg_share = get_package_share_directory('mobile_robot')
-
     world_file = os.path.join(pkg_share, 'worlds', 'ignition_world.world')
     headless = LaunchConfiguration('headless').perform(context).lower() == 'true'
     gz_args = f'-r -s --force-version 6 {world_file}' if headless \
@@ -64,7 +73,6 @@ def launch_gazebo(context, *args, **kwargs):
 
 def generate_launch_description():
     package_name = 'mobile_robot'
-    pkg_share    = get_package_share_directory(package_name)
 
     use_sim_time     = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
@@ -106,37 +114,45 @@ def generate_launch_description():
     )
 
     # -------------------------------------------------------------------------
-    # frame_id fixer for /scan
+    # Scan frame_id fixer
     #
-    # Ignition Fortress gpu_lidar sets header.frame_id to its internal
-    # namespaced path: 'mobile_robot/base_footprint/laser'
-    # The ROS TF tree only knows 'laser_frame' (from robot_state_publisher).
-    # SLAM Toolbox and RViz drop every message because the frame never
-    # matches, producing the 'queue is full' error loop.
+    # Ignition Fortress gpu_lidar sets header.frame_id to the internal
+    # namespaced path 'mobile_robot/base_footprint/laser'. The ROS TF tree
+    # only has 'laser_frame'. SLAM Toolbox drops every message — no map.
     #
-    # This node rewrites frame_id to 'laser_frame' on every incoming scan.
-    # SLAM Toolbox and RViz must subscribe to /scan_fixed, not /scan.
+    # topic_tools transform:
+    #   - input  topic : /scan       (sensor_msgs/msg/LaserScan)
+    #   - output topic : /scan_fixed (sensor_msgs/msg/LaserScan)
+    #   - expression   : rewrites header.frame_id to 'laser_frame'
+    #
+    # SLAM Toolbox subscribes /scan_fixed (see mapper_params_online_async.yaml).
     # -------------------------------------------------------------------------
     scan_frame_fixer = Node(
-        package='ros_gz_bridge',
-        executable='parameter_bridge',
+        package='topic_tools',
+        executable='transform',
         name='scan_frame_fixer',
-        # Re-use parameter_bridge just to relay; frame_id is fixed below
-        # via a small Python relay node instead
-        parameters=[{'use_sim_time': use_sim_time}],
-        output='screen',
-    )
-
-    # Python relay: rewrites frame_id and republishes on /scan_fixed
-    scan_relay = Node(
-        package='mobile_robot',
-        executable='scan_frame_fixer',
-        name='scan_frame_fixer',
-        parameters=[
-            {'use_sim_time': use_sim_time},
-            {'target_frame': 'laser_frame'},
+        arguments=[
+            '/scan',
+            '/scan_fixed',
+            'sensor_msgs/msg/LaserScan',
+            # Python expression: copy message, overwrite frame_id
+            "sensor_msgs.msg.LaserScan("
+            "header=std_msgs.msg.Header("
+            "stamp=m.header.stamp, "
+            "frame_id='laser_frame'), "
+            "angle_min=m.angle_min, "
+            "angle_max=m.angle_max, "
+            "angle_increment=m.angle_increment, "
+            "time_increment=m.time_increment, "
+            "scan_time=m.scan_time, "
+            "range_min=m.range_min, "
+            "range_max=m.range_max, "
+            "ranges=m.ranges, "
+            "intensities=m.intensities)",
+            '--import', 'sensor_msgs', 'std_msgs',
         ],
         output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
     )
 
     joint_state_broadcaster_spawner = Node(
@@ -165,6 +181,6 @@ def generate_launch_description():
         OpaqueFunction(function=launch_gazebo),
         spawn_entity,
         bridge,
-        scan_relay,
+        scan_frame_fixer,
         delayed_spawners,
     ])
