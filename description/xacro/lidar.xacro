@@ -34,19 +34,16 @@
     <!--
         Ignition Fortress gpu_lidar sensor.
 
-        sensor type="gpu_lidar" is the correct Ignition type (NOT "ray").
+        CRITICAL: use <lidar> child element, NOT <ray>.
+        <ray> is Gazebo Classic syntax. Ignition silently ignores it,
+        the topic exists and the bridge connects, but zero messages
+        are ever published.
 
-        NO <plugin> block inside <sensor>. The world-level Sensors plugin
-        (libignition-gazebo-sensors-system.so in ignition_world.world)
-        automatically drives ALL sensor types including gpu_lidar.
+        The world-level Sensors plugin (ignition_world.world) drives
+        this sensor. No <plugin> block is needed here.
 
-        libignition-gazebo-gpu-rays-system.so does NOT exist in Ignition
-        Fortress — specifying it causes:
-          [Err] Failed to load system plugin: couldn't find shared library
-
-        <topic> sets the short Ignition topic name. The full path bridged
-        to ROS /scan by ros_gz_bridge.yaml is:
-          /world/ignition_world/model/mobile_robot/link/laser_frame/sensor/laser/scan
+        Topic: Ignition publishes on global /scan (confirmed via ign topic -l).
+        Bridge maps Ignition /scan -> ROS /scan in ros_gz_bridge.yaml.
     -->
     <gazebo reference="laser_frame">
         <material>Gazebo/Red</material>
@@ -58,7 +55,7 @@
             <visualize>false</visualize>
             <topic>scan</topic>
             <frame_id>laser_frame</frame_id>
-            <ray>
+            <lidar>
                 <scan>
                     <horizontal>
                         <samples>360</samples>
@@ -72,7 +69,7 @@
                     <max>12.0</max>
                     <resolution>0.01</resolution>
                 </range>
-            </ray>
+            </lidar>
         </sensor>
     </gazebo>
 
