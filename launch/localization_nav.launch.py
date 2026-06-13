@@ -54,14 +54,22 @@ def generate_launch_description():
     map_yaml         = LaunchConfiguration('map')
     headless         = LaunchConfiguration('headless')
 
-    # ── Robot State Publisher (real-robot only) ──────────────────────────────
+    # ── Robot State Publisher (always runs — sim AND real robot) ─────────────
+    # RSP MUST run in both modes because:
+    #   - In sim mode:  gz.launch.py deliberately does NOT start RSP.
+    #                   If RSP is suppressed here, /robot_description is never
+    #                   published, ros_gz_sim create waits forever, and
+    #                   gz_ros2_control (and controller_manager) never start.
+    #   - In real mode: RSP is the sole publisher of /robot_description and
+    #                   the static joint TFs.
+    # The xacro sim_mode arg still correctly selects the Gazebo plugin vs the
+    # real hardware interface, so the generated URDF is correct in both cases.
     xacro_file = os.path.join(pkg_share, 'description', 'robot.urdf.xacro')
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='robot_state_publisher',
         output='both',
-        condition=UnlessCondition(sim_mode),
         parameters=[{
             'robot_description': ParameterValue(
                 Command([
@@ -90,6 +98,8 @@ def generate_launch_description():
     )
 
     # ── ros2_control + spawners (real-robot only) ───────────────────────────
+    # In sim mode gz_ros2_control is loaded by the Gazebo plugin in the URDF
+    # and the spawners are handled inside gz.launch.py.
     controller_params_file = os.path.join(pkg_share, 'config', 'controllers.yaml')
 
     control_node = Node(
@@ -200,9 +210,10 @@ def generate_launch_description():
             description='Set true to suppress RViz (e.g. on Jetson)',
         ),
         LogInfo(msg='[localization_nav.launch.py] Mode: LOCALIZATION+NAV — AMCL + Nav2 active, SLAM NOT started.'),
+        # ── RSP (all modes) ─────────────────────────────────────────────────
+        robot_state_publisher,
         # ── Sim OR real-robot hardware stack ────────────────────────────────
         gazebo_sim,
-        robot_state_publisher,
         control_node,
         diff_drive_spawner,
         joint_broad_spawner,

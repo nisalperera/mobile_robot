@@ -7,7 +7,7 @@ Launch arguments
 ----------------
 sim_mode        : true (default) | false
     true  → starts Gazebo + bridges. Set false for the real Jetson robot.
-usse_sim_time   : true (default) | false
+use_sim_time    : true (default) | false
 use_ros2_control: true (default) | false
 headless        : true (default) | false
     true  → does not launch RViz.
@@ -46,16 +46,22 @@ def generate_launch_description():
     use_ros2_control = LaunchConfiguration('use_ros2_control')
     headless         = LaunchConfiguration('headless')
 
-    # ── Robot State Publisher (real-robot only) ──────────────────────────────
-    # In sim mode gz.launch.py owns RSP; launching a second one causes a
-    # duplicate-node conflict.
+    # ── Robot State Publisher (always runs — sim AND real robot) ─────────────
+    # RSP MUST run in both modes because:
+    #   - In sim mode:  gz.launch.py deliberately does NOT start RSP.
+    #                   If RSP is suppressed here, /robot_description is never
+    #                   published, ros_gz_sim create waits forever, and
+    #                   gz_ros2_control (and controller_manager) never start.
+    #   - In real mode: RSP is the sole publisher of /robot_description and
+    #                   the static joint TFs.
+    # The xacro sim_mode arg still correctly selects the Gazebo plugin vs the
+    # real hardware interface, so the generated URDF is correct in both cases.
     xacro_file = os.path.join(pkg_share, 'description', 'robot.urdf.xacro')
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='robot_state_publisher',
         output='both',
-        condition=UnlessCondition(sim_mode),
         parameters=[{
             'robot_description': ParameterValue(
                 Command([
@@ -69,8 +75,9 @@ def generate_launch_description():
     )
 
     # ── Gazebo (sim mode only) ───────────────────────────────────────────────
-    # gz.launch.py starts Ignition Gazebo, spawns the robot, bridges topics,
-    # and activates the diff_drive_controller (publishes odom->base_link TF).
+    # gz.launch.py starts Ignition Gazebo, spawns the robot from
+    # /robot_description (published above), bridges topics, and activates
+    # the diff_drive_controller (which publishes the odom→base_link TF).
     gazebo_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', 'gz.launch.py')
@@ -86,6 +93,8 @@ def generate_launch_description():
     )
 
     # ── ros2_control + spawners (real-robot only) ───────────────────────────
+    # In sim mode gz_ros2_control is loaded by the Gazebo plugin in the URDF
+    # and the spawners are handled inside gz.launch.py.
     controller_params_file = os.path.join(pkg_share, 'config', 'controllers.yaml')
 
     control_node = Node(
@@ -181,9 +190,10 @@ def generate_launch_description():
             description='Set true to suppress RViz (e.g. on Jetson)',
         ),
         LogInfo(msg='[mapping.launch.py] Mode: MAPPING — SLAM Toolbox active, AMCL/Nav2 NOT started.'),
+        # ── RSP (all modes) ─────────────────────────────────────────────────
+        robot_state_publisher,
         # ── Sim OR real-robot hardware stack ────────────────────────────────
         gazebo_sim,
-        robot_state_publisher,
         control_node,
         diff_drive_spawner,
         joint_broad_spawner,
