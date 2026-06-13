@@ -25,10 +25,9 @@ TF ownership (authoritative sources only):
 
 Bridge config:
   All topic bridges are declared in config/ros_gz_bridge.yaml.
-  The YAML approach is preferred over inline args because:
-    - No shell-escaping issues with long Ignition topic names
-    - Lidar remapping (/world/ignition_world/.../scan -> /scan) is clean
-    - Easy to add/remove topics without touching launch code
+  IMPORTANT: parameter_bridge loads the YAML via --config-file, NOT
+  --ros-args --params-file. --params-file is for ROS2 node parameters;
+  --config-file is the parameter_bridge-specific bridge topic list arg.
 """
 
 import os
@@ -50,7 +49,6 @@ logger = logging.getLogger('launch')
 
 
 def log_args(context, *args, **kwargs):
-    package_name = 'mobile_robot'
     logger.info(
         f"[gz.launch.py] "
         f"use_sim_time={LaunchConfiguration('use_sim_time').perform(context)} "
@@ -67,7 +65,7 @@ def launch_gazebo(context, *args, **kwargs):
     gz_args = f'-r -s --force-version 6 {world_file}' if headless \
               else f'-r --force-version 6 {world_file}'
 
-    existing_plugin_path  = os.environ.get('IGN_GAZEBO_SYSTEM_PLUGIN_PATH', '')
+    existing_plugin_path   = os.environ.get('IGN_GAZEBO_SYSTEM_PLUGIN_PATH', '')
     existing_resource_path = os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')
 
     plugin_paths = ':'.join(filter(None, [
@@ -116,15 +114,20 @@ def generate_launch_description():
 
     # -------------------------------------------------------------------------
     # Topic bridge: Ignition <-> ROS2
-    # Config lives in config/ros_gz_bridge.yaml — see that file for the full
-    # topic list and direction rationale (especially why /tf is excluded).
+    # Config lives in config/ros_gz_bridge.yaml.
+    #
+    # CRITICAL: use --config-file, NOT --ros-args --params-file.
+    #   --params-file  = standard ROS2 node parameter file loading
+    #   --config-file  = parameter_bridge-specific bridge topic list
+    # Using --params-file causes the bridge to start with zero topics
+    # and the node fails to register on the ROS graph.
     # -------------------------------------------------------------------------
     bridge_config = os.path.join(pkg_share, 'config', 'ros_gz_bridge.yaml')
 
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        arguments=['--ros-args', '--params-file', bridge_config],
+        arguments=['--config-file', bridge_config],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
     )

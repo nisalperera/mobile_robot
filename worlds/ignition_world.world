@@ -1,13 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.8">
 
-  <!--
-    World name MUST be 'ignition_world' to match the topic paths used
-    in the ros_gz_bridge config (ros_gz_bridge.yaml).
-    Lidar topic in Ignition:
-      /world/ignition_world/model/mobile_robot/link/laser_frame/sensor/laser/scan
-    If you rename this world you must also update ros_gz_bridge.yaml.
-  -->
   <world name="ignition_world">
 
     <physics name="1ms" type="ignored">
@@ -24,21 +17,17 @@
             name="ignition::gazebo::systems::SceneBroadcaster"/>
 
     <!--
-      Sensors system plugin — MANDATORY for ANY sensor (lidar, camera, IMU)
-      to publish data. Without this plugin every sensor in the world is
-      completely silent even if the per-sensor plugin in the URDF is correct.
-      Install: ros-humble-ros-ign-gazebo (already a dep of ros_gz_sim)
+      Sensors system plugin — MANDATORY for ANY sensor to publish data.
+      render_engine ogre2 is required for gpu_lidar.
     -->
     <plugin filename="libignition-gazebo-sensors-system.so"
             name="ignition::gazebo::systems::Sensors">
       <render_engine>ogre2</render_engine>
     </plugin>
 
-    <!-- IMU system — required when any IMU sensor is present -->
     <plugin filename="libignition-gazebo-imu-system.so"
             name="ignition::gazebo::systems::Imu"/>
 
-    <!-- Contact system — required for collision contact sensors -->
     <plugin filename="libignition-gazebo-contact-system.so"
             name="ignition::gazebo::systems::Contact"/>
 
@@ -50,6 +39,7 @@
       <direction>-0.5 0.1 -0.9</direction>
     </light>
 
+    <!-- Ground plane -->
     <model name="floor">
       <static>true</static>
       <link name="link">
@@ -58,12 +48,7 @@
             <plane><normal>0 0 1</normal><size>100 100</size></plane>
           </geometry>
           <surface>
-            <friction>
-              <ode>
-                <mu>1.0</mu>
-                <mu2>1.0</mu2>
-              </ode>
-            </friction>
+            <friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction>
           </surface>
         </collision>
         <visual name="surface">
@@ -74,6 +59,65 @@
             <ambient>0.8 0.8 0.8 1</ambient>
             <diffuse>0.8 0.8 0.8 1</diffuse>
           </material>
+        </visual>
+      </link>
+    </model>
+
+    <!--
+      Room walls — 4 boxes forming a ~6x6m room around the robot spawn.
+      Without geometry in the world the lidar returns all-inf ranges
+      which is valid but useless for SLAM Toolbox map building.
+      Wall height 0.5m is enough to intersect the lidar at z=0.212m.
+    -->
+
+    <!-- North wall -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 3 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>6 0.1 0.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>6 0.1 0.5</size></box></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- South wall -->
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -3 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>6 0.1 0.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>6 0.1 0.5</size></box></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East wall -->
+    <model name="wall_east">
+      <static>true</static>
+      <pose>3 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.1 6 0.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.1 6 0.5</size></box></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West wall -->
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-3 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.1 6 0.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.1 6 0.5</size></box></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
         </visual>
       </link>
     </model>
