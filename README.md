@@ -19,20 +19,24 @@ This repository provides resources and code for building and simulating an auton
 
 2. Install ROS (recommended: ROS Noetic or ROS2 Humble) and Gazebo on your system (recommended to use Docker).
 3. Install required dependencies:
-    - ros-${ROS_DISTRO}-ros-gz
-    - ros-${ROS_DISTRO}-gazebo-ros-pkgs
-    - ros-${ROS_DISTRO}-joint-state-publisher-gui
-    - ros-${ROS_DISTRO}-controller-manager
-    - ros-${ROS_DISTRO}-twist-mux
-    - ros-${ROS_DISTRO}-slam-toolbox
-    - ros-${ROS_DISTRO}-controller-manager
-    - ros-${ROS_DISTRO}-joint-trajectory-controller
-    - ros-${ROS_DISTRO}-joint-state-broadcaster
-    - ros-${ROS_DISTRO}-ros2-control
-    - ros-${ROS_DISTRO}-ros2-controllers
-    - ros-${ROS_DISTRO}-gazebo-ros2-control
-    - ros-${ROS_DISTRO}-navigation2
-    - ros-${ROS_DISTRO}-nav2-bringup
+    - ros-{Distro}-xacro
+    - ros-{Distro}-robot-state-publisher
+    - ros-{Distro}-joint-state-publisher
+    - ros-{Distro}-rviz2
+    - ros-{Distro}-joy
+    - ros-{Distro}-teleop-twist-joy
+    - ros-{Distro}-twist-mux
+    - ros-{Distro}-controller-manager
+    - ros-{Distro}-joint-state-broadcaster
+    - ros-{Distro}-diff-drive-controller
+    - ros-{Distro}-ros2-control
+    - ros-{Distro}-ros2-controllers
+    - ros-{Distro}-slam-toolbox
+    - ros-{Distro}-navigation2
+    - ros-{Distro}-nav2-bringup
+    - ros-{Distro}-ros-gz-sim
+    - ros-{Distro}-ros-gz-bridge
+    - ros-{Distro}-topic-tools
 
 4. Build with colcon:  
     ```bash
