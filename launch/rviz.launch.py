@@ -25,22 +25,6 @@ def generate_launch_description():
 					 output='log',
 					 arguments=['-d', rviz_config_file],
                 )
-    
-    xacro_file = get_package_share_directory(package_name) + '/description/robot.urdf.xacro'
-    # robot_state_publisher = Node(
-    #     package='robot_state_publisher',
-    #     executable='robot_state_publisher',
-    #     name='robot_state_publisher',
-    #     output='both',
-    #     parameters=[{
-    #         'robot_description': ParameterValue(Command([
-    #             'xacro', ' ', xacro_file,
-    #             ' use_ros2_control:=', use_ros2_control,
-    #             ' sim_mode:=', use_sim_time,
-    #         ]), value_type=str),
-    #         'use_sim_time': use_sim_time,
-    #     }],
-    # )
 
     launch_descriptions = LaunchDescription([
             DeclareLaunchArgument(
