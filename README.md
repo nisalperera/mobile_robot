@@ -78,7 +78,7 @@ This repository provides resources and code for building and simulating an auton
 
 ## TODO
 
-- Update to new Gazebo version
+- Recreate the world models and maps using Gazebo and ROS2 tools
 - Complete Stereo camera integration and obstacles detection using cameras
 - Integrate real hardware drivers for popular stereo cameras and LiDAR models
 - Improve teleoperation script compatibility (joystick, custom input devices)
