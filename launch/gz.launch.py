@@ -14,15 +14,18 @@ NOT responsible for:
   - SLAM / AMCL / Nav2     (owned by the top-level launch file)
 
 TF ownership:
-  odom → base_footprint      → diff_drive_controller (ros2_control, via gz_ros2_control)
+  odom → base_footprint      → diff_drive_controller (ros2_control)
   base_footprint → base_link → robot_state_publisher (fixed joint)
-  base_link → wheels/sensors → robot_state_publisher
+  base_link → chassis → wheels/sensors → robot_state_publisher
 
-  The /tf bridge from Ignition is intentionally REMOVED. Ignition's built-in
-  DiffDrive system plugin publishes TF with namespaced frame IDs
-  (e.g. mobile_robot/odom → mobile_robot/base_footprint). If those are
-  forwarded into ROS they clobber the correct odom→base_footprint transform
-  that diff_drive_controller already publishes, breaking the RViz TF tree.
+  /tf is NOT bridged from Ignition. Ignition's DiffDrive system plugin
+  publishes namespaced frames (mobile_robot/odom). Bridging those would
+  overwrite the correct odom→base_footprint from diff_drive_controller.
+
+  The LaserScan sensor topic IS bridged from Ignition → ROS as /scan.
+  The full Ignition topic name is:
+    /world/ignition_world/model/mobile_robot/link/laser_frame/sensor/laser/scan
+  which is mapped to the ROS topic /scan via the bridge remapping below.
 """
 
 import os
@@ -95,13 +98,10 @@ def generate_launch_description():
     use_sim_time     = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
 
-    pkg_share = get_package_share_directory(package_name)
-
     # -------------------------------------------------------------------------
     # Spawn robot entity.
-    # /robot_description must already be published by the time this runs.
-    # The top-level launch file (mapping / localization_nav) owns RSP and
-    # starts it before including gz.launch.py.
+    # RSP must already be running (started by the top-level launch file)
+    # before this action executes so /robot_description is available.
     # -------------------------------------------------------------------------
     spawn_entity = Node(
         package='ros_gz_sim',
@@ -115,26 +115,23 @@ def generate_launch_description():
     )
 
     # -------------------------------------------------------------------------
-    # Topic bridges: Ignition ↔ ROS2
+    # Topic bridges: Ignition → ROS2
     #
     # Bridge notation:
     #   topic@ros_type@ign_type  → bidirectional
     #   topic@ros_type[ign_type  → Ignition → ROS only
     #   topic@ros_type]ign_type  → ROS → Ignition only
     #
-    # NOTE: /tf is intentionally NOT bridged here.
+    # /tf is NOT bridged — see module docstring for why.
     #
-    # Ignition's DiffDrive system plugin publishes TF with namespaced frame IDs
-    # (mobile_robot/odom → mobile_robot/base_footprint). Forwarding those into
-    # ROS would overwrite the correct odom→base_footprint transform that
-    # diff_drive_controller (ros2_control) publishes, breaking the TF chain
-    # and making the robot appear frozen in RViz even though it moves in Gazebo.
-    #
-    # diff_drive_controller is solely responsible for publishing:
-    #   odom → base_footprint  (via publish_odom_tf: true in controllers.yaml)
-    #
-    # robot_state_publisher is solely responsible for publishing:
-    #   base_footprint → base_link → chassis / wheels / sensors
+    # LaserScan bridge:
+    #   Ignition gpu_lidar publishes on the full model-namespaced topic:
+    #     /world/ignition_world/model/mobile_robot/link/laser_frame/sensor/laser/scan
+    #   We bridge this to the ROS topic /scan using the ros_gz_bridge
+    #   topic remapping argument format:
+    #     /ign_topic@ros_type[ign_type  with  --ros-args -r /ign_topic:=/ros_topic
+    #   The cleaner approach supported by ros_gz_bridge is to specify
+    #   the full IGN topic on the left and remap via the remappings list.
     # -------------------------------------------------------------------------
     bridge = Node(
         package='ros_gz_bridge',
@@ -143,16 +140,25 @@ def generate_launch_description():
             '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
             f'/model/{package_name}/cmd_vel@geometry_msgs/msg/Twist@ignition.msgs.Twist',
             f'/model/{package_name}/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
-            '/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
+            # LaserScan: bridge the full Ignition topic name, then remap to /scan
+            f'/world/ignition_world/model/{package_name}/link/laser_frame/sensor/laser/scan'
+            f'@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
             '/left_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
             '/right_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/right_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
         ],
+        remappings=[
+            # Remap the full Ignition lidar topic to the short /scan ROS topic
+            # that SLAM Toolbox and Nav2 expect.
+            (
+                f'/world/ignition_world/model/{package_name}/link/laser_frame/sensor/laser/scan',
+                '/scan'
+            ),
+        ],
         output='screen',
         parameters=[
             {'use_sim_time': use_sim_time},
-            {'expand_gz_topic_names': False},
         ],
     )
 

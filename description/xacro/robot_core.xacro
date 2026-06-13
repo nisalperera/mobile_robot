@@ -9,21 +9,33 @@
     <xacro:include filename="$(find mobile_robot)/description/xacro/left_wheels.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/right_wheels.xacro" />
 
-    <!-- Base link -->
-    <link name="base_link"></link>
+    <!--
+        IMPORTANT: base_footprint MUST be declared first so that every URDF
+        parser (including ROS2 Foxy's urdf_parser) correctly identifies it as
+        the root link. The root is determined by finding a link that never
+        appears as a <child> in any joint. If base_link is declared first,
+        older parsers may pick it as root and publish base_link→base_footprint
+        (inverted), which breaks the entire TF chain:
+          map → odom → base_footprint → base_link  (correct)
+          map → odom → base_link → base_footprint  (WRONG — breaks Nav2 / SLAM)
+    -->
 
+    <!-- Virtual root link: no geometry, no inertia, sits on the ground plane -->
+    <link name="base_footprint"/>
+
+    <!-- base_footprint → base_link (fixed, zero offset) -->
     <joint name="base_footprint_joint" type="fixed">
-        <child link="base_link" />
         <parent link="base_footprint"/>
+        <child  link="base_link"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
-    <link name="base_footprint"></link>
+    <link name="base_link"/>
 
-    <!-- Chassis -->
+    <!-- base_link → chassis -->
     <joint name="chassis_joint" type="fixed">
-        <parent link="base_link" />
-        <child link="chassis" />
+        <parent link="base_link"/>
+        <child  link="chassis"/>
         <origin xyz="-0.1 0 0"/>
     </joint>
 

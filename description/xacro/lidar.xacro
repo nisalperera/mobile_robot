@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
     <joint name="laser_joint" type="fixed">
         <parent link="chassis"/>
-        <child link="laser_frame"/>
+        <child  link="laser_frame"/>
         <origin xyz="0.122 0 0.212" rpy="0 0 0"/>
     </joint>
 
@@ -31,34 +31,57 @@
         </xacro:inertial_cylinder>
     </link>
 
+    <!--
+        Ignition Fortress lidar sensor.
 
+        Use sensor type="gpu_lidar" (not "ray").
+        "ray" is the Gazebo Classic type and does NOT work in Ignition.
 
+        The plugin that drives the sensor is libignition-gazebo-gpu-rays-system.so
+        loaded via the <sensor> block. The world must also load the
+        Sensors world-level system plugin (libignition-gazebo-sensors-system.so)
+        in the .world file — without it every sensor in the world is silent.
+
+        Topic remapping:
+          Ignition publishes on:  /world/<world>/model/mobile_robot/link/laser_frame/sensor/laser/scan
+          The gz.launch.py bridge maps this to ROS topic: /scan
+          SLAM Toolbox subscribes to: /scan
+    -->
     <gazebo reference="laser_frame">
         <material>Gazebo/Red</material>
 
-        <sensor name="laser" type="ray">
-            <pose> 0 0 0 0 0 0 </pose>
+        <sensor name="laser" type="gpu_lidar">
+            <pose>0 0 0 0 0 0</pose>
             <visualize>false</visualize>
             <update_rate>10</update_rate>
-            <ray>
+            <lidar>
                 <scan>
                     <horizontal>
                         <samples>360</samples>
-                        <min_angle>-3.14</min_angle>
-                        <max_angle>3.14</max_angle>
+                        <resolution>1</resolution>
+                        <min_angle>-3.14159</min_angle>
+                        <max_angle>3.14159</max_angle>
                     </horizontal>
                 </scan>
                 <range>
                     <min>0.3</min>
-                    <max>12</max>
+                    <max>12.0</max>
+                    <resolution>0.01</resolution>
                 </range>
-            </ray>
-            <plugin name="ignition::gazebo::systems::Sensors" filename="libignition-gazebo-sensors-system.so">
-                <ros>
-                    <argument> ~/out:=scan</argument>
-                </ros>
+            </lidar>
+            <!--
+                topic: the short name published inside Ignition.
+                The full Ignition topic will be:
+                  /world/<world_name>/model/mobile_robot/link/laser_frame/sensor/laser/scan
+                gz.launch.py bridges this to the ROS topic /scan.
+                frame_id must match the URDF link name so LaserScan
+                messages carry the correct TF frame.
+            -->
+            <plugin name="ignition::gazebo::systems::GpuLidar"
+                    filename="libignition-gazebo-gpu-rays-system.so">
+                <topic>scan</topic>
+                <frame_id>laser_frame</frame_id>
                 <output_type>sensor_msgs/LaserScan</output_type>
-                <frame_name>laser_frame</frame_name>
             </plugin>
         </sensor>
     </gazebo>
