@@ -1,21 +1,36 @@
+"""gz.launch.py
+
+Ignition Gazebo hardware launcher — simulation only.
+
+Responsibilities:
+  1. Start Ignition Gazebo (headless or with GUI)
+  2. Spawn the robot entity from /robot_description
+  3. Bridge Ignition ↔ ROS2 topics
+  4. Spawn joint_state_broadcaster + diff_drive_controller via TimerAction
+
+NOT responsible for:
+  - robot_state_publisher  (owned by the top-level launch file)
+  - RViz                   (owned by the top-level launch file)
+  - SLAM / AMCL / Nav2     (owned by the top-level launch file)
+
+This clean separation prevents duplicate RSP nodes that corrupt /tf and
+/robot_description when gz.launch.py is included by mapping.launch.py or
+localization_nav.launch.py.
+"""
+
 import os
 import logging
 
 from ament_index_python.packages import get_package_share_directory
 
-from launch_ros.parameter_descriptions import ParameterValue
 from launch import LaunchDescription
 from launch.actions import (
-    IncludeLaunchDescription,
     DeclareLaunchArgument,
-    OpaqueFunction,
     ExecuteProcess,
+    OpaqueFunction,
     TimerAction,
-    RegisterEventHandler,
 )
-from launch.event_handlers import OnProcessStart
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, Command
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 logger = logging.getLogger('launch')
@@ -70,62 +85,39 @@ def launch_gazebo(context, *args, **kwargs):
 def generate_launch_description():
     package_name = 'mobile_robot'
 
-    use_sim_time = LaunchConfiguration('use_sim_time')
+    use_sim_time     = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
 
     pkg_share = get_package_share_directory(package_name)
-    xacro_file = pkg_share + '/description/robot.urdf.xacro'
 
     # -------------------------------------------------------------------------
-    # FIX 1: robot_state_publisher must be present in THIS launch file.
-    # Previously it was only conditionally launched from rviz.launch.py via
-    # the robot_description argument. gz.launch.py needs its own RSP so that
-    # /robot_description is published BEFORE Ignition spawns the entity and
-    # BEFORE the controller_manager tries to read the URDF.
+    # Spawn robot entity.
+    # /robot_description must already be published by the time this runs.
+    # The top-level launch file (mapping / localization_nav) owns RSP and
+    # starts it before including gz.launch.py.
     # -------------------------------------------------------------------------
-    robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='both',
-        parameters=[{
-            'robot_description': ParameterValue(Command([
-                'xacro', ' ', xacro_file,
-                ' use_ros2_control:=', use_ros2_control,
-                ' sim_mode:=', use_sim_time
-            ]), value_type=str)
-        }],
-    )
-
-
-    rviz = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_share, 'launch', 'rviz.launch.py')
-        ),
-        launch_arguments={
-            'use_sim_time': use_sim_time,
-            'use_ros2_control': use_ros2_control,
-            'robot_description': 'false',
-        }.items(),
-    )
-
     spawn_entity = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
             '-topic', 'robot_description',
-            '-name', package_name,
+            '-name',  package_name,
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
     # -------------------------------------------------------------------------
-    # FIX 2: Bridge /tf as bidirectional so both Ignition-published TFs
-    # (from ign_ros2_control) and ROS2-published TFs (from robot_state_publisher)
-    # are available on the same /tf topic.
-    # Format: topic@ros_type@ign_type  (@ = bidirectional)
-    # Previously used [ (Ignition->ROS only), which drops RSP wheel TFs.
+    # Topic bridges: Ignition ↔ ROS2
+    #
+    # Bridge notation:
+    #   topic@ros_type@ign_type  → bidirectional
+    #   topic@ros_type[ign_type  → Ignition → ROS only
+    #   topic@ros_type]ign_type  → ROS → Ignition only
+    #
+    # /tf must be bidirectional (@) so both Ignition-published TFs
+    # (odom→base_footprint from diff_drive) AND RSP-published TFs
+    # (base_link→wheels etc.) are visible on the same /tf topic.
     # -------------------------------------------------------------------------
     bridge = Node(
         package='ros_gz_bridge',
@@ -134,7 +126,7 @@ def generate_launch_description():
             '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
             f'/model/{package_name}/cmd_vel@geometry_msgs/msg/Twist@ignition.msgs.Twist',
             f'/model/{package_name}/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
-            '/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V',
+            '/tf@tf2_msgs/msg/TFMessage@ignition.msgs.Pose_V',
             '/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
             '/left_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
@@ -149,34 +141,24 @@ def generate_launch_description():
     )
 
     # -------------------------------------------------------------------------
-    # FIX 3: Spawn joint_state_broadcaster and diff_drive_controller.
-    # Previously MISSING from gz.launch.py entirely.
-    # Without these, controller_manager loads but no controller publishes
-    # /joint_states, so robot_state_publisher cannot compute wheel TFs.
-    # TimerAction(5.0s) allows Ignition + ign_ros2_control plugin to fully
-    # initialise before spawner connects to the controller_manager service.
+    # Controller spawners.
+    # TimerAction(5 s) gives Ignition + gz_ros2_control time to fully
+    # initialise before spawner connects to /controller_manager.
     # -------------------------------------------------------------------------
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=[
-            'joint_state_broadcaster',
-            '--controller-manager', '/controller_manager',
-        ],
+        arguments=['joint_state_broadcaster', '--controller-manager', '/controller_manager'],
         output='screen',
     )
 
     diff_drive_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=[
-            'diff_drive_controller',
-            '--controller-manager', '/controller_manager',
-        ],
+        arguments=['diff_drive_controller', '--controller-manager', '/controller_manager'],
         output='screen',
     )
 
-    # Delay controller spawning until Ignition + ign_ros2_control are ready
     delayed_controller_spawners = TimerAction(
         period=5.0,
         actions=[
@@ -197,17 +179,14 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'use_slam',
             default_value='false',
-            description='Use SLAM if true'),
+            description='Passed through from parent launch (unused here)'),
         DeclareLaunchArgument(
             'headless',
             default_value='true',
-            description='Run Gazebo server-only (no GUI/rendering). '
-                        'Set false once NVIDIA GPU passthrough is configured.'),
+            description='Run Gazebo server-only (no GUI). Set false to show Gazebo GUI.'),
         OpaqueFunction(function=log_args),
-        robot_state_publisher,
         OpaqueFunction(function=launch_gazebo),
         spawn_entity,
         bridge,
-        rviz,
         delayed_controller_spawners,
     ])

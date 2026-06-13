@@ -15,14 +15,15 @@ slam_toolbox:
     base_frame: base_footprint
     scan_topic: /scan
     use_map_saver: true
-    mode: localization # mapping 
+    mode: mapping
 
-    # if you'd like to immediately start continuing a map at a given pose
-    # or at the dock, but they are mutually exclusive, if pose is given
-    # will use pose
-    map_file_name: mobile_robot/maps/map_serial
+    # map_file_name and map_start_at_dock are only relevant in localization
+    # mode (loading a pre-serialised posegraph). In mapping mode these must
+    # be absent — if present SLAM Toolbox attempts to open the file and
+    # emits an ERROR, then never publishes the map→odom TF.
+    # map_file_name: mobile_robot/maps/map_serial
+    # map_start_at_dock: true
     # map_start_pose: [0.0, 0.0, 0.0]
-    map_start_at_dock: true
 
     debug_logging: true
     throttle_scans: 1
