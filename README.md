@@ -56,14 +56,14 @@ This repository provides resources and code for building and simulating an auton
     ros2 launch mobile_robot mapping.launch.py world:=house_world
     ```
 
-## Gazebo
+<!-- ## Gazebo
 <img src="images/gazebo.png" aling="center" alt="gazebo ss" />
 
 ## RViz2
 <img src="images/rviz.png" aling="center" alt="rviz ss" />
 
 - Use joystick for manual control (You can change the button config in [joystick config](config/joystick.yaml)).
-- Run stereo camera and LiDAR nodes for autonomous tasks (Still under development).
+- Run stereo camera and LiDAR nodes for autonomous tasks (Still under development). -->
 
 ## Project Structure
 
