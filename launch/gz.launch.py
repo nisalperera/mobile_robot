@@ -1,33 +1,6 @@
 """gz.launch.py
 
 Ignition Gazebo hardware launcher — simulation only.
-
-Responsibilities:
-  1. Start Ignition Gazebo (headless or with GUI)
-  2. Spawn the robot entity from /robot_description
-  3. Bridge Ignition <-> ROS2 topics via config/ros_gz_bridge.yaml
-  4. Spawn joint_state_broadcaster + diff_drive_controller via TimerAction
-
-NOT responsible for:
-  - robot_state_publisher  (owned by the top-level launch file)
-  - RViz                   (owned by the top-level launch file)
-  - SLAM / AMCL / Nav2     (owned by the top-level launch file)
-
-TF ownership (authoritative sources only):
-  map -> odom                : SLAM Toolbox (mapping) or AMCL (localization)
-  odom -> base_footprint     : diff_drive_controller (ros2_control)
-  base_footprint -> base_link: robot_state_publisher (fixed joint in URDF)
-  base_link -> all children  : robot_state_publisher
-
-  The Ignition /tf topic is NOT bridged. Ignition's DiffDrive system plugin
-  publishes TF with namespaced frames (mobile_robot/odom). Bridging those
-  overwrites the correct odom->base_footprint from diff_drive_controller.
-
-Bridge config:
-  All topic bridges are declared in config/ros_gz_bridge.yaml.
-  IMPORTANT: parameter_bridge loads the YAML via --config-file, NOT
-  --ros-args --params-file. --params-file is for ROS2 node parameters;
-  --config-file is the parameter_bridge-specific bridge topic list arg.
 """
 
 import os
@@ -96,11 +69,6 @@ def generate_launch_description():
     use_sim_time     = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
 
-    # -------------------------------------------------------------------------
-    # Spawn robot into Ignition.
-    # RSP must be running (started by the top-level launch file) BEFORE this
-    # so that /robot_description is already published.
-    # -------------------------------------------------------------------------
     spawn_entity = Node(
         package='ros_gz_sim',
         executable='create',
@@ -114,29 +82,45 @@ def generate_launch_description():
 
     # -------------------------------------------------------------------------
     # Topic bridge: Ignition <-> ROS2
-    # Config lives in config/ros_gz_bridge.yaml.
     #
-    # CRITICAL: use --config-file, NOT --ros-args --params-file.
-    #   --params-file  = standard ROS2 node parameter file loading
-    #   --config-file  = parameter_bridge-specific bridge topic list
-    # Using --params-file causes the bridge to start with zero topics
-    # and the node fails to register on the ROS graph.
+    # Format: 'gz_topic@ros_msg_type@gz_msg_type'
+    # Prefix with [ for GZ->ROS only, ] for ROS->GZ only, @ for bidirectional.
+    #
+    # --config-file is NOT available in the ros_gz_bridge version shipped
+    # with ROS2 Humble — it was added in later releases. Using it causes
+    # parameter_bridge to crash immediately on startup.
+    #
+    # /tf is intentionally excluded — see TF ownership notes above.
     # -------------------------------------------------------------------------
-    bridge_config = os.path.join(pkg_share, 'config', 'ros_gz_bridge.yaml')
-
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        arguments=['--config-file', bridge_config],
+        arguments=[
+            # Clock: Ignition -> ROS
+            '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
+            # Drive command: ROS -> Ignition
+            '/model/mobile_robot/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist',
+            # Odometry: Ignition -> ROS, remapped in remappings below
+            '/model/mobile_robot/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
+            # Lidar 2D scan: Ignition -> ROS
+            # Topic confirmed via: ign topic -l | grep scan -> /scan
+            '/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
+            # Lidar point cloud: Ignition -> ROS
+            '/scan/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+            # Cameras: Ignition -> ROS
+            '/left_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            '/right_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            '/right_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+        ],
+        remappings=[
+            ('/model/mobile_robot/odometry', '/diff_drive_controller/odom'),
+            ('/model/mobile_robot/cmd_vel',  '/diff_drive_controller/cmd_vel_unstamped'),
+        ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # -------------------------------------------------------------------------
-    # Controller spawners.
-    # 5 s delay gives Ignition + ign_ros2_control time to fully initialise
-    # the controller_manager before the spawner tries to connect.
-    # -------------------------------------------------------------------------
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
@@ -157,10 +141,8 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time',      default_value='true'),
         DeclareLaunchArgument('use_ros2_control',  default_value='true'),
-        DeclareLaunchArgument('use_slam',          default_value='false',
-            description='Passed through from parent launch (unused here)'),
-        DeclareLaunchArgument('headless',          default_value='true',
-            description='true = server-only (no GUI), false = show Gazebo GUI'),
+        DeclareLaunchArgument('use_slam',          default_value='false'),
+        DeclareLaunchArgument('headless',          default_value='true'),
         OpaqueFunction(function=log_args),
         OpaqueFunction(function=launch_gazebo),
         spawn_entity,
