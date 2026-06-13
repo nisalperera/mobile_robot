@@ -1,18 +1,46 @@
 <?xml version="1.0" ?>
 <sdf version="1.8">
-  <world name="default">
+
+  <!--
+    World name MUST be 'ignition_world' to match the topic paths used
+    in the ros_gz_bridge config (ros_gz_bridge.yaml).
+    Lidar topic in Ignition:
+      /world/ignition_world/model/mobile_robot/link/laser_frame/sensor/laser/scan
+    If you rename this world you must also update ros_gz_bridge.yaml.
+  -->
+  <world name="ignition_world">
 
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
 
+    <!-- Core simulation systems -->
     <plugin filename="libignition-gazebo-physics-system.so"
             name="ignition::gazebo::systems::Physics"/>
     <plugin filename="libignition-gazebo-user-commands-system.so"
             name="ignition::gazebo::systems::UserCommands"/>
     <plugin filename="libignition-gazebo-scene-broadcaster-system.so"
             name="ignition::gazebo::systems::SceneBroadcaster"/>
+
+    <!--
+      Sensors system plugin — MANDATORY for ANY sensor (lidar, camera, IMU)
+      to publish data. Without this plugin every sensor in the world is
+      completely silent even if the per-sensor plugin in the URDF is correct.
+      Install: ros-humble-ros-ign-gazebo (already a dep of ros_gz_sim)
+    -->
+    <plugin filename="libignition-gazebo-sensors-system.so"
+            name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- IMU system — required when any IMU sensor is present -->
+    <plugin filename="libignition-gazebo-imu-system.so"
+            name="ignition::gazebo::systems::Imu"/>
+
+    <!-- Contact system — required for collision contact sensors -->
+    <plugin filename="libignition-gazebo-contact-system.so"
+            name="ignition::gazebo::systems::Contact"/>
 
     <light type="directional" name="sun">
       <cast_shadows>true</cast_shadows>
@@ -29,6 +57,14 @@
           <geometry>
             <plane><normal>0 0 1</normal><size>100 100</size></plane>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.0</mu>
+                <mu2>1.0</mu2>
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <visual name="surface">
           <geometry>
