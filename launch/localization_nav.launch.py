@@ -13,14 +13,18 @@ map             : path to map YAML file
                   (default: <package>/maps/map_save.yaml)
 headless        : true (default) | false
     true  → does not launch RViz.
+world           : world name or absolute path (default: ignition_world)
+    Name is resolved to <pkg_share>/worlds/<name>.world automatically.
+    e.g. world:=house_world  or  world:=/tmp/my_arena.world
 
 Example (Laptop — simulation)
 -----------------------------
     ros2 launch mobile_robot localization_nav.launch.py
+    ros2 launch mobile_robot localization_nav.launch.py world:=house_world
 
     # With a custom map:
     ros2 launch mobile_robot localization_nav.launch.py \\
-        map:=/path/to/my_map.yaml
+        world:=house_world map:=/path/to/house_map.yaml
 
 Example (Jetson — real robot)
 ------------------------------
@@ -53,17 +57,9 @@ def generate_launch_description():
     use_ros2_control = LaunchConfiguration('use_ros2_control')
     map_yaml         = LaunchConfiguration('map')
     headless         = LaunchConfiguration('headless')
+    world            = LaunchConfiguration('world')
 
     # ── Robot State Publisher (always runs — sim AND real robot) ─────────────
-    # RSP MUST run in both modes because:
-    #   - In sim mode:  gz.launch.py deliberately does NOT start RSP.
-    #                   If RSP is suppressed here, /robot_description is never
-    #                   published, ros_gz_sim create waits forever, and
-    #                   gz_ros2_control (and controller_manager) never start.
-    #   - In real mode: RSP is the sole publisher of /robot_description and
-    #                   the static joint TFs.
-    # The xacro sim_mode arg still correctly selects the Gazebo plugin vs the
-    # real hardware interface, so the generated URDF is correct in both cases.
     xacro_file = os.path.join(pkg_share, 'description', 'robot.urdf.xacro')
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -83,8 +79,6 @@ def generate_launch_description():
     )
 
     # ── Gazebo (sim mode only) ───────────────────────────────────────────────
-    # Pass use_slam=false so gz.launch.py does not start any SLAM/localiser
-    # — AMCL here is the sole source of the map→odom TF.
     gazebo_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', 'gz.launch.py')
@@ -92,14 +86,13 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time':     use_sim_time,
             'use_ros2_control': use_ros2_control,
-            'use_slam': 'false',
+            'use_slam':         'false',
+            'world':            world,
         }.items(),
         condition=IfCondition(sim_mode),
     )
 
     # ── ros2_control + spawners (real-robot only) ───────────────────────────
-    # In sim mode gz_ros2_control is loaded by the Gazebo plugin in the URDF
-    # and the spawners are handled inside gz.launch.py.
     controller_params_file = os.path.join(pkg_share, 'config', 'controllers.yaml')
 
     control_node = Node(
@@ -151,8 +144,6 @@ def generate_launch_description():
     )
 
     # ── AMCL (localization) ──────────────────────────────────────────────────
-    # localization.launch.py starts map_server + amcl lifecycle nodes.
-    # The map_yaml arg points to the pre-built map.
     amcl_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
     amcl = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -208,6 +199,14 @@ def generate_launch_description():
             'headless',
             default_value='false',
             description='Set true to suppress RViz (e.g. on Jetson)',
+        ),
+        DeclareLaunchArgument(
+            'world',
+            default_value='ignition_world',
+            description=(
+                'World to load in Gazebo. Accepts a name from worlds/ or an '
+                'absolute path. e.g. world:=house_world'
+            ),
         ),
         LogInfo(msg='[localization_nav.launch.py] Mode: LOCALIZATION+NAV — AMCL + Nav2 active, SLAM NOT started.'),
         # ── RSP (all modes) ─────────────────────────────────────────────────

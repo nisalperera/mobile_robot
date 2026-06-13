@@ -11,10 +11,14 @@ use_sim_time    : true (default) | false
 use_ros2_control: true (default) | false
 headless        : true (default) | false
     true  → does not launch RViz.
+world           : world name or absolute path (default: ignition_world)
+    Name is resolved to <pkg_share>/worlds/<name>.world automatically.
+    e.g. world:=house_world  or  world:=/tmp/my_arena.world
 
 Example (Laptop — simulation)
 -----------------------------
     ros2 launch mobile_robot mapping.launch.py
+    ros2 launch mobile_robot mapping.launch.py world:=house_world
 
 Example (Jetson — real robot)
 ------------------------------
@@ -45,17 +49,9 @@ def generate_launch_description():
     use_sim_time     = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
     headless         = LaunchConfiguration('headless')
+    world            = LaunchConfiguration('world')
 
     # ── Robot State Publisher (always runs — sim AND real robot) ─────────────
-    # RSP MUST run in both modes because:
-    #   - In sim mode:  gz.launch.py deliberately does NOT start RSP.
-    #                   If RSP is suppressed here, /robot_description is never
-    #                   published, ros_gz_sim create waits forever, and
-    #                   gz_ros2_control (and controller_manager) never start.
-    #   - In real mode: RSP is the sole publisher of /robot_description and
-    #                   the static joint TFs.
-    # The xacro sim_mode arg still correctly selects the Gazebo plugin vs the
-    # real hardware interface, so the generated URDF is correct in both cases.
     xacro_file = os.path.join(pkg_share, 'description', 'robot.urdf.xacro')
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -75,9 +71,6 @@ def generate_launch_description():
     )
 
     # ── Gazebo (sim mode only) ───────────────────────────────────────────────
-    # gz.launch.py starts Ignition Gazebo, spawns the robot from
-    # /robot_description (published above), bridges topics, and activates
-    # the diff_drive_controller (which publishes the odom→base_link TF).
     gazebo_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', 'gz.launch.py')
@@ -85,16 +78,13 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time':     use_sim_time,
             'use_ros2_control': use_ros2_control,
-            # SLAM Toolbox will publish the map→odom TF; pass use_slam=false
-            # to gz.launch.py so it doesn't also start any SLAM node.
-            'use_slam': 'false',
+            'use_slam':         'false',
+            'world':            world,
         }.items(),
         condition=IfCondition(sim_mode),
     )
 
     # ── ros2_control + spawners (real-robot only) ───────────────────────────
-    # In sim mode gz_ros2_control is loaded by the Gazebo plugin in the URDF
-    # and the spawners are handled inside gz.launch.py.
     controller_params_file = os.path.join(pkg_share, 'config', 'controllers.yaml')
 
     control_node = Node(
@@ -146,7 +136,6 @@ def generate_launch_description():
     )
 
     # ── SLAM Toolbox (online async — mapping mode) ───────────────────────────
-    # mapper_params_online_async.yaml must have mode: mapping
     slam_params_file = os.path.join(pkg_share, 'config', 'mapper_params_online_async.yaml')
     slam = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -188,6 +177,14 @@ def generate_launch_description():
             'headless',
             default_value='false',
             description='Set true to suppress RViz (e.g. on Jetson)',
+        ),
+        DeclareLaunchArgument(
+            'world',
+            default_value='ignition_world',
+            description=(
+                'World to load in Gazebo. Accepts a name from worlds/ or an '
+                'absolute path. e.g. world:=house_world'
+            ),
         ),
         LogInfo(msg='[mapping.launch.py] Mode: MAPPING — SLAM Toolbox active, AMCL/Nav2 NOT started.'),
         # ── RSP (all modes) ─────────────────────────────────────────────────
