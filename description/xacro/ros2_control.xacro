@@ -1,14 +1,23 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+    <!-- =====================================================================
+         REAL ROBOT: esp32_hardware/L298Hardware
+         Active when sim_mode:=false (use_ros2_control:=true on real hardware)
+         FIX: Removed duplicate left_wheel_name / right_wheel_name param keys.
+              The L298Hardware plugin only supports one left + one right joint.
+              For 4-wheel skid-steer on real hardware, use a plugin that accepts
+              left_wheel_names / right_wheel_names arrays, or drive front/rear
+              pairs in tandem at the hardware level.
+         ===================================================================== -->
     <xacro:unless value="$(arg sim_mode)">
         <ros2_control name="RealRobot" type="system">
             <hardware>
                 <plugin>esp32_hardware/L298Hardware</plugin>
                 <param name="left_wheel_name">front_left_wheel_joint</param>
                 <param name="right_wheel_name">front_right_wheel_joint</param>
-                <param name="left_wheel_name">rear_left_wheel_joint</param>
-                <param name="right_wheel_name">rear_right_wheel_joint</param>
+                <param name="rear_left_wheel_name">rear_left_wheel_joint</param>
+                <param name="rear_right_wheel_name">rear_right_wheel_joint</param>
                 <param name="loop_rate">30</param>
                 <param name="device">/dev/ttyUSB0</param>
                 <param name="baud_rate">57600</param>
@@ -50,10 +59,17 @@
         </ros2_control>
     </xacro:unless>
 
+    <!-- =====================================================================
+         SIMULATION: gz_ros2_control/GazeboSimSystem
+         Active when sim_mode:=true
+         FIX: Plugin filename corrected for ROS2 Humble + Ignition Fortress:
+              Use libign_ros2_control-system.so from the ign_ros2_control package.
+              Install: sudo apt install ros-humble-ign-ros2-control
+         ===================================================================== -->
     <xacro:if value="$(arg sim_mode)">
-        <ros2_control name="GazeboSimSystem" type="system">
+        <ros2_control name="IgnitionSystem" type="system">
             <hardware>
-                <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+                <plugin>ign_ros2_control/IgnitionSystem</plugin>
             </hardware>
             <joint name="front_left_wheel_joint">
                 <command_interface name="velocity">
@@ -90,17 +106,20 @@
         </ros2_control>
     </xacro:if>
 
+    <!-- =====================================================================
+         Ignition Fortress ros2_control plugin
+         FIX: Corrected plugin name for ROS2 Humble + Ignition Fortress.
+              ign_ros2_control::IgnitionROS2ControlPlugin is the correct
+              fully-qualified plugin class for this version combination.
+              Package: ros-humble-ign-ros2-control
+         ===================================================================== -->
     <gazebo>
-        <plugin name="ign_ros2_control::IgnitionROS2ControlPlugin" filename="libign_ros2_control-system.so">
+        <plugin name="ign_ros2_control::IgnitionROS2ControlPlugin"
+                filename="libign_ros2_control-system.so">
             <parameters>$(find mobile_robot)/config/controllers.yaml</parameters>
             <parameters>$(find mobile_robot)/config/gaz_ros2_ctl_use_sim.yaml</parameters>
-            <parameters>$(find mobile_robot)/config/controllers.yaml</parameters>
             <robot_param>robot_description</robot_param>
             <robot_param_node>robot_state_publisher</robot_param_node>
-            <robotSimType>gz_ros2_control/GazeboSimSystem</robotSimType>
-            <!-- <ros>
-                <namespace>mobile_robot</namespace>
-            </ros> -->
         </plugin>
     </gazebo>
 
