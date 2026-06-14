@@ -108,6 +108,33 @@ def generate_launch_description():
     )
 
     # -------------------------------------------------------------------------
+    # IMU complementary filter (real robot only)
+    # Fuses raw IMU data from the hardware driver into an orientation estimate.
+    # In simulation the Ignition IMU plugin outputs a complete Imu message
+    # (angular velocity + linear acceleration) on /imu so no filter is needed.
+    #
+    # Hardware driver is expected to publish sensor_msgs/msg/Imu on /imu/data_raw.
+    # The filter node re-publishes the filtered result on /imu/data.
+    #
+    # Install: sudo apt install ros-foxy-imu-complementary-filter
+    # -------------------------------------------------------------------------
+    imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter.yaml')
+    imu_filter = Node(
+        package='imu_complementary_filter',
+        executable='complementary_filter_node',
+        name='imu_complementary_filter',
+        output='screen',
+        condition=UnlessCondition(sim_mode),
+        parameters=[imu_filter_params],
+        remappings=[
+            # Hardware driver publishes raw data on this topic
+            ('/imu/data_raw', '/imu/data_raw'),
+            # Filtered output used by Nav2 / EKF
+            ('/imu/data',     '/imu/data'),
+        ],
+    )
+
+    # -------------------------------------------------------------------------
     # Joystick / teleop
     # -------------------------------------------------------------------------
     joystick = IncludeLaunchDescription(
@@ -192,11 +219,12 @@ def generate_launch_description():
             description='Launch SLAM, AMCL and Nav2'),
         # Sim-mode: Gazebo handles everything (RSP, control, odom TF)
         gazebo_sim,
-        # Real-robot mode: RSP + control stack launched here
+        # Real-robot mode: RSP + control stack + IMU filter launched here
         robot_state_publisher,
         control_node,
         diff_drive_spawner,
         joint_broad_spawner,
+        imu_filter,
         # Common nodes (both modes)
         joystick,
         slam,

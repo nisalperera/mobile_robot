@@ -11,8 +11,10 @@
         The gz.launch.py spawns joint_state_broadcaster and diff_drive_controller
         via controller_manager spawner nodes, which provide wheel /tf and /joint_states.
 
-        If you need sensor-only Gazebo plugins (e.g. IMU, GPS), add them here.
+        IMU sensor plugin is self-contained in description/xacro/imu.xacro.
+        The ros_gz_bridge entry for /imu is in launch/gz.launch.py.
         DO NOT re-add libgazebo_ros_diff_drive.so — it will conflict with ros2_control.
+        DO NOT add libgazebo_ros_imu_sensor.so — that is Gazebo Classic, not Ignition.
     -->
 
 </robot>

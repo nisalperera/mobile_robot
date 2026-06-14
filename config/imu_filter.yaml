@@ -1,0 +1,46 @@
+# imu_filter.yaml
+#
+# Parameters for the imu_complementary_filter node (package: imu_complementary_filter).
+# Used on the REAL ROBOT (Jetson Xavier NX) to fuse raw IMU data from the hardware
+# driver into a filtered orientation estimate.
+#
+# Install:  sudo apt install ros-foxy-imu-complementary-filter
+#
+# Launch:   ros2 run imu_complementary_filter complementary_filter_node \
+#               --ros-args --params-file config/imu_filter.yaml
+#
+# Topics consumed:  /imu/data_raw   (sensor_msgs/msg/Imu — from hardware driver)
+# Topics produced:  /imu/data       (sensor_msgs/msg/Imu — filtered, with orientation)
+#
+# In SIMULATION the Ignition IMU plugin already outputs angular velocity +
+# linear acceleration without a separate filter node.  The bridge re-publishes
+# directly on /imu so no filter is needed in sim mode.
+
+complementary_filter_node:
+    ros__parameters:
+        # Input/output topic remapping is done via CLI remapping; these params
+        # control filter behaviour only.
+
+        # Gain for the accelerometer correction step [0, 1].
+        # Lower value = smoother but slower to correct; 0.01 is a safe default.
+        gain_acc: 0.01
+
+        # Gain for the magnetometer correction step (set 0 if no mag present).
+        gain_mag: 0.0
+
+        # Orientation is expressed in the world frame (ENU convention).
+        do_bias_estimation: true
+        do_adaptive_gain: true
+
+        # Publish a /tf transform from the world frame to imu_link.
+        publish_tf: false
+
+        # Fixed frame used when publish_tf is true.
+        fixed_frame: odom
+
+        # Set to true to enable 9-DOF fusion (requires /imu/mag topic).
+        use_mag: false
+
+        # Quaternion orientation covariance added to the output message.
+        # Represents orientation uncertainty (rad²) in roll, pitch, yaw.
+        orientation_stddev: 0.01
