@@ -33,22 +33,63 @@ slam_toolbox:
 
     debug_logging: false
     throttle_scans: 1
+
+    # -------------------------------------------------------------------------
+    # transform_publish_period: how often SLAM publishes map->odom TF (seconds).
+    # At 0.02s (50 Hz) SLAM extrapolates map->odom between scan matches using
+    # the odometry. Keep this at 50 Hz so RViz and Nav2 always have a fresh TF.
+    # -------------------------------------------------------------------------
     transform_publish_period: 0.02
-    map_update_interval: 5.0
+
+    # -------------------------------------------------------------------------
+    # map_update_interval: how often the occupancy grid is rebuilt (seconds).
+    # Reduced from 5.0 -> 3.0 so the displayed map stays visually current
+    # during exploration. Does not affect scan matching frequency.
+    # -------------------------------------------------------------------------
+    map_update_interval: 3.0
+
     resolution: 0.05
     min_laser_range: 0.3
     max_laser_range: 12.0
-    minimum_time_interval: 0.5
-    transform_timeout: 0.2
-    tf_buffer_duration: 30.
+
+    # -------------------------------------------------------------------------
+    # minimum_travel_distance / minimum_travel_heading
+    #
+    # SLAM Toolbox only runs a scan match after the robot has moved at least
+    # this far OR rotated at least this much since the last match.
+    #
+    # Previous values (0.5 m / 0.5 rad) were too large:
+    #   - SLAM buffered many scans between matches
+    #   - When thresholds were finally crossed, a single large map->odom
+    #     correction was applied all at once -> visible map jump/rotation in
+    #     RViz when odom is the fixed frame
+    #   - Between matches, odometry error (4-wheel turning geometry) accumulated
+    #     unchecked, causing gradual map drift/rotation
+    #
+    # New values (0.1 m / 0.2 rad ~11 deg):
+    #   - Scan matches fire more frequently -> smaller, smoother corrections
+    #   - Map->odom TF stays stable; no visible rotation bursts in RViz
+    #   - Slight CPU cost increase — acceptable on a laptop running Gazebo
+    #   - If you see SLAM CPU spike, raise minimum_travel_distance to 0.2
+    # -------------------------------------------------------------------------
+    minimum_travel_distance: 0.1
+    minimum_travel_heading: 0.2
+
+    # -------------------------------------------------------------------------
+    # transform_timeout: how long SLAM waits for a TF lookup before giving up.
+    # Increased from 0.2 -> 0.3 s to tolerate brief TF gaps on slower machines
+    # or when the 5s fixer delay causes a momentary /scan_fixed dropout.
+    # -------------------------------------------------------------------------
+    transform_timeout: 0.3
+
+    tf_buffer_duration: 30.0
     stack_size_to_use: 40000000
     enable_interactive_mode: true
 
     # General Parameters
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.5
-    minimum_travel_heading: 0.5
+
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
     link_match_minimum_response_fine: 0.1
@@ -70,9 +111,24 @@ slam_toolbox:
     loop_search_space_resolution: 0.05
     loop_search_space_smear_deviation: 0.03
 
-    # Scan Matcher Parameters
+    # -------------------------------------------------------------------------
+    # Scan Matcher variance penalties
+    #
+    # angle_variance_penalty: penalises large rotational corrections during
+    # scan matching. Previous value of 1.0 was too permissive — SLAM was
+    # applying large yaw corrections on every scan match, causing the map
+    # frame to visibly rotate in RViz.
+    #
+    # Increased to 1.5: SLAM now requires stronger scan match evidence before
+    # applying a rotational correction. Works together with the tighter
+    # minimum_travel_heading (0.2 rad) to keep map->odom stable.
+    #
+    # If walls appear slightly skewed in the map, decrease back toward 1.0.
+    # If map still rotates, increase toward 2.0.
+    # -------------------------------------------------------------------------
     distance_variance_penalty: 0.5
-    angle_variance_penalty: 1.0
+    angle_variance_penalty: 1.5
+
     fine_search_angle_offset: 0.00349
     coarse_search_angle_offset: 0.349
     coarse_angle_resolution: 0.0349
