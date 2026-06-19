@@ -13,9 +13,21 @@
           y  left
           z  up
 
-        Gazebo / Ignition plugin:
-          libignition-gazebo-imu-system.so  (ships with Ignition Fortress)
-          Publishes on Ignition topic /imu  (bridged to ROS /imu in gz.launch.py)
+        Ignition Fortress IMU system plugin:
+          Registered ONCE at world level in ignition_world.world:
+            <plugin filename="libignition-gazebo-imu-system.so"
+                    name="ignition::gazebo::systems::Imu"/>
+
+          DO NOT add that <plugin> block here inside the <sensor>.
+          Registering it twice (world + sensor) causes a double-init
+          that corrupts the IgnitionROS2ControlPlugin load order and
+          silently prevents the controller_manager from activating,
+          freezing the robot while IMU data still publishes normally.
+
+        Topic pipeline (simulation):
+          Ignition sensor  ->  /imu  (ignition topic)
+          ros_gz_bridge    ->  /imu  (ROS sensor_msgs/Imu, raw)
+          imu_frame_fixer  ->  /imu_fixed  (frame_id rewritten to 'imu_link')
 
         Noise model:
           Linear acceleration: mean=0, stddev=0.01 m/s²  (low-cost MEMS typical)
@@ -28,7 +40,7 @@
         <child  link="imu_link"/>
         <!-- Mounted at the geometric centre of the top face:
              chassis origin is at chassis corner, visual/collision origin
-             is offset (0.15, 0, 0.075) inside chassis.xacro.
+             is offset (0.15, 0, 0.075) inside robot_core.xacro.
              Place IMU at the same XY centre, sitting on top face (z=0.15). -->
         <origin xyz="0.15 0 0.15" rpy="0 0 0"/>
     </joint>
@@ -64,23 +76,16 @@
     </link>
 
     <!--
-        Ignition Fortress IMU sensor plugin.
+        Ignition Fortress IMU sensor definition.
 
-        CRITICAL (Fortress-specific):
-          Use plugin filename="libignition-gazebo-imu-system.so"
-          NOT libgazebo_ros_imu_sensor.so — that is Gazebo Classic only.
+        No <plugin> block inside here — the world-level Imu system plugin
+        (ignition_world.world) drives this sensor automatically.
 
-        The sensor must be nested inside a <gazebo reference="imu_link">
-        block so Ignition attaches it to the correct link transform.
-
-        Topic remapping:
-          Ignition publishes internally on /imu.
-          ros_gz_bridge in gz.launch.py bridges this to ROS /imu.
-          An imu_frame_fixer in gz.launch.py rewrites header.frame_id
-          from the Ignition namespaced path to 'imu_link'.
-
-        For the real robot the same topic name (/imu) is produced by
-        the hardware driver (e.g. MPU6050 / ICM-42688-P over I²C/SPI).
+        <frame_id> is set here as a hint; the actual frame_id in the
+        published Ignition message will still be the namespaced path
+        (mobile_robot/base_footprint/imu_link). The imu_frame_fixer node
+        in gz.launch.py rewrites it to 'imu_link' before any ROS consumer
+        sees the message.
     -->
     <gazebo reference="imu_link">
         <sensor name="imu_sensor" type="imu">
@@ -131,9 +136,7 @@
                     </z>
                 </linear_acceleration>
             </imu>
-            <plugin filename="libignition-gazebo-imu-system.so"
-                    name="ignition::gazebo::systems::Imu">
-            </plugin>
+            <!-- NO <plugin> block here. World-level Imu system handles this sensor. -->
         </sensor>
     </gazebo>
 
