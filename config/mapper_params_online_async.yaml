@@ -50,8 +50,8 @@ slam_toolbox:
     # correction. If you see the map drift during slow rotations, lower
     # back to 0.2. If you see jumps on every small turn, raise to 0.35.
     # -------------------------------------------------------------------------
-    minimum_travel_distance: 0.1
-    minimum_travel_heading: 0.3
+    minimum_travel_distance: 0.15
+    minimum_travel_heading: 0.35
 
     # transform_timeout: how long SLAM waits for TF before giving up.
     # 0.5s gives extra margin now that controller_manager runs at 100 Hz
@@ -68,7 +68,7 @@ slam_toolbox:
 
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
-    link_match_minimum_response_fine: 0.1
+    link_match_minimum_response_fine: 0.15
     link_scan_maximum_distance: 1.5
     loop_search_maximum_distance: 3.0
     do_loop_closing: true
@@ -108,7 +108,7 @@ slam_toolbox:
     # If map still rotates during straight driving, increase toward 3.0.
     # -------------------------------------------------------------------------
     distance_variance_penalty: 0.5
-    angle_variance_penalty: 2.5
+    angle_variance_penalty: 3.0
 
     fine_search_angle_offset: 0.00349
     coarse_search_angle_offset: 0.349
