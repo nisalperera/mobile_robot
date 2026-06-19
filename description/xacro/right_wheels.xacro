@@ -28,10 +28,10 @@
         </xacro:inertial_cylinder>
     </link>
 
-    <!-- ---------------------------------------------------------------
-         Ignition Gazebo friction + contact properties for right wheels.
+    <!--
+         Ignition Gazebo friction and contact properties for right wheels.
          See left_wheels.xacro for full parameter rationale.
-    ---------------------------------------------------------------- -->
+    -->
     <gazebo reference="front_right_wheel">
         <material>Gazebo/Black</material>
         <mu>1.0</mu>
