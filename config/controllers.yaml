@@ -50,7 +50,7 @@ diff_drive_controller:
     #   The multiplier value of 1.0 means no additional scaling beyond the
     #   physical separation. Start here and tune empirically:
     #     1. Drive a 1-metre square in Gazebo.
-    #     2. Compare final pose in /diff_drive_controller/odom vs Gazebo pose.
+    #     2. Compare final pose in /odom vs Gazebo ground-truth pose.
     #     3. If RViz robot lags behind turns: increase toward 1.05.
     #        If RViz robot over-rotates turns: decrease toward 0.95.
     #   Typical range for a 4-wheel skid-steer with 0.20 m wheelbase: 0.95–1.08.
@@ -69,11 +69,14 @@ diff_drive_controller:
     use_stamped_vel: false
 
     # -------------------------------------------------------------------------
-    # TF and odometry frame configuration.
+    # TF and odometry topic configuration.
     #
-    # publish_odom_tf: true  → diff_drive_controller writes the
-    #   odom → base_footprint transform directly onto /tf.
-    #   This is the ONLY publisher of this transform.
+    # publish_odom: true     → publishes nav_msgs/Odometry on /odom.
+    #   This is REQUIRED for Nav2, EKF (robot_localization), and any node
+    #   that subscribes to the /odom topic. Distinct from publish_odom_tf.
+    #
+    # publish_odom_tf: true  → writes the odom → base_footprint transform
+    #   directly onto /tf. This is the ONLY publisher of this transform.
     #   Ignition's /tf bridge has been removed from gz.launch.py to
     #   prevent the namespaced Gazebo frames (mobile_robot/odom →
     #   mobile_robot/base_footprint) from clobbering this.
@@ -89,6 +92,7 @@ diff_drive_controller:
     #     base_footprint → base_link (robot_state_publisher, fixed)
     #     base_link → chassis/wheels/sensors (robot_state_publisher)
     # -------------------------------------------------------------------------
+    publish_odom: true
     publish_odom_tf: true
     odom_frame_id: odom
     base_frame_id: base_footprint
