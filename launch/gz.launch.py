@@ -24,10 +24,15 @@ before any ROS node sees it:
   /right_camera/image -> /right_camera/image_fixed (frame_id: right_camera_link_optical)
   /imu                -> /imu_fixed                (frame_id: imu_link)
 
-The camera and IMU fixers are delayed by 3 s (TimerAction) so that
-ros_gz_bridge has time to connect to Ignition and begin publishing
-before topic_tools tries to subscribe. Without the delay the transform
-nodes exit immediately with 'wrong input topic'.
+All four fixers are delayed by 5 s (TimerAction) so that:
+  1. ros_gz_bridge has connected to Ignition and is publishing
+  2. The robot has been spawned by ros_gz_sim create
+  3. Controller spawners have fired (also at 5 s)
+before any topic_tools/transform node tries to subscribe.
+
+Without a delay, topic_tools exits immediately with 'no publisher'
+if the input topic is not yet live, and /scan_fixed / /imu_fixed
+never publish for the lifetime of the session.
 
 World selection:
   Pass world:=<name>  to load a different world at runtime.
@@ -78,12 +83,9 @@ def _resolve_world_path(context):
     world_arg = LaunchConfiguration('world').perform(context)
 
     if os.path.isabs(world_arg):
-        # Absolute path provided directly
         world_file = world_arg
     else:
-        # Treat as a world name inside the package worlds/ directory
         pkg_share = get_package_share_directory('mobile_robot')
-        # Accept both 'house_world' and 'house_world.world'
         name = world_arg if world_arg.endswith('.world') else f'{world_arg}.world'
         world_file = os.path.join(pkg_share, 'worlds', name)
 
@@ -152,8 +154,6 @@ def generate_launch_description():
 
     # -------------------------------------------------------------------------
     # Topic bridge: Ignition <-> ROS2
-    # /imu bridges ignition.msgs.IMU -> sensor_msgs/msg/Imu
-    # Direction: [  means Ignition -> ROS (subscriber side)
     # -------------------------------------------------------------------------
     bridge = Node(
         package='ros_gz_bridge',
@@ -168,7 +168,6 @@ def generate_launch_description():
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
             '/right_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/right_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            # IMU: Ignition publishes on /imu, bridged unidirectionally to ROS
             '/imu@sensor_msgs/msg/Imu[ignition.msgs.IMU',
         ],
         remappings=[
@@ -180,26 +179,22 @@ def generate_launch_description():
     )
 
     # =========================================================================
-    # Frame-id fixers
+    # Frame-id fixers — ALL delayed by 5 s
     #
-    # Ignition Fortress sets header.frame_id to the fully-namespaced internal
-    # sensor path for every sensor. None of these exist in the ROS TF tree.
-    # Each fixer subscribes the raw bridged topic, rewrites frame_id to the
-    # correct URDF link name, and republishes on a _fixed topic.
+    # CRITICAL: topic_tools/transform exits silently if the input topic has
+    # no publisher when the node starts. Starting fixers immediately caused
+    # /scan_fixed to never publish (SLAM gets no scans -> no /map).
     #
-    # Downstream consumers (RViz, SLAM Toolbox, perception nodes) must
-    # subscribe the _fixed topics, NOT the raw bridge topics.
+    # 5 s covers:
+    #   ~2 s  Ignition world load + robot spawn
+    #   ~1 s  ros_gz_bridge connects to Ignition topics
+    #   ~2 s  controller spawners activate (also fired at 5 s)
     #
-    # The lidar fixer starts immediately — /scan is available as soon as
-    # the bridge connects.
-    #
-    # The camera and IMU fixers are delayed by 3 s so ros_gz_bridge has time
-    # to connect to Ignition and start publishing before topic_tools tries
-    # to subscribe. Without the delay topic_tools exits with:
-    #   "wrong input topic" / no publisher found.
+    # If your machine is slow, increase this value.
     # =========================================================================
+    FIXER_DELAY = 5.0
 
-    # --- Lidar (no delay needed) ---------------------------------------------
+    # --- Lidar ---------------------------------------------------------------
     scan_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -227,7 +222,7 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # --- Left camera (delayed 3 s) -------------------------------------------
+    # --- Left camera ---------------------------------------------------------
     left_camera_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -252,7 +247,7 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # --- Right camera (delayed 3 s) ------------------------------------------
+    # --- Right camera --------------------------------------------------------
     right_camera_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -277,10 +272,7 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # --- IMU frame fixer (delayed 3 s) ---------------------------------------
-    # Ignition publishes frame_id as 'mobile_robot/base_footprint/imu_link'
-    # (or similar namespaced path). Rewrite to 'imu_link' so RViz / Nav2
-    # can resolve it in the TF tree.
+    # --- IMU -----------------------------------------------------------------
     imu_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -305,17 +297,19 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # Camera and IMU fixers share a single 3-second delay so they start
-    # together after the bridge is ready.
+    # All fixers share a single TimerAction — 5 s after launch
     delayed_sensor_fixers = TimerAction(
-        period=3.0,
+        period=FIXER_DELAY,
         actions=[
+            scan_frame_fixer,
             left_camera_frame_fixer,
             right_camera_frame_fixer,
             imu_frame_fixer,
         ],
     )
 
+    # -------------------------------------------------------------------------
+    # Controller spawners — also at 5 s (robot must be spawned first)
     # -------------------------------------------------------------------------
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
@@ -359,14 +353,13 @@ def generate_launch_description():
                 '  - A world name (file stem) from the worlds/ directory,\n'
                 '    e.g. world:=ignition_world  or  world:=house_world\n'
                 '  - An absolute path to a .world file,\n'
-                '    e.g. world:=/tmp/my_arena.world'
+                '    e.g. world:=/abs/path/to.world'
             )
         ),
         OpaqueFunction(function=log_args),
         OpaqueFunction(function=launch_gazebo),
         spawn_entity,
         bridge,
-        scan_frame_fixer,
         delayed_sensor_fixers,
         delayed_spawners,
     ])
