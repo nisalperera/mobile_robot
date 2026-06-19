@@ -28,8 +28,17 @@
         </xacro:inertial_cylinder>
     </link>
 
+    <!-- ---------------------------------------------------------------
+         Ignition Gazebo friction + contact properties for right wheels.
+         See left_wheels.xacro for full parameter rationale.
+    ---------------------------------------------------------------- -->
     <gazebo reference="front_right_wheel">
         <material>Gazebo/Black</material>
+        <mu>1.0</mu>
+        <mu2>0.5</mu2>
+        <kp>1000000.0</kp>
+        <kd>1.0</kd>
+        <minDepth>0.001</minDepth>
     </gazebo>
 
     <!-- Rear wheel -->
@@ -57,9 +66,13 @@
         </xacro:inertial_cylinder>
     </link>
 
-
     <gazebo reference="rear_right_wheel">
         <material>Gazebo/Black</material>
+        <mu>1.0</mu>
+        <mu2>0.5</mu2>
+        <kp>1000000.0</kp>
+        <kd>1.0</kd>
+        <minDepth>0.001</minDepth>
     </gazebo>
 
 </robot>

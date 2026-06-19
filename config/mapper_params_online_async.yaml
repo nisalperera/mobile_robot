@@ -14,8 +14,7 @@ slam_toolbox:
     # base_frame: Must match the child frame of the odom->base_footprint
     #   transform. robot_state_publisher uses bare 'base_footprint'.
     # scan_topic: /scan_fixed — scan_frame_fixer rewrites the Ignition
-    #   namespaced frame_id 'mobile_robot/base_footprint/laser' to
-    #   'laser_frame' before SLAM Toolbox sees it.
+    #   namespaced frame_id to 'laser_frame' before SLAM sees it.
     odom_frame: odom
     map_frame: map
     base_frame: base_footprint
@@ -23,29 +22,15 @@ slam_toolbox:
     use_map_saver: true
     mode: mapping
 
-    # map_file_name and map_start_at_dock are only relevant in localization
-    # mode (loading a pre-serialised posegraph). In mapping mode these must
-    # be absent — if present SLAM Toolbox attempts to open the file and
-    # emits an ERROR, then never publishes the map->odom TF.
-    # map_file_name: mobile_robot/maps/map_serial
-    # map_start_at_dock: true
-    # map_start_pose: [0.0, 0.0, 0.0]
-
     debug_logging: false
     throttle_scans: 1
 
-    # -------------------------------------------------------------------------
-    # transform_publish_period: how often SLAM publishes map->odom TF (seconds).
-    # At 0.02s (50 Hz) SLAM extrapolates map->odom between scan matches using
-    # the odometry. Keep this at 50 Hz so RViz and Nav2 always have a fresh TF.
-    # -------------------------------------------------------------------------
+    # transform_publish_period: how often SLAM publishes map->odom TF (s).
+    # 0.02s (50 Hz) keeps RViz and Nav2 fed with a fresh transform between
+    # scan matches using odometry extrapolation.
     transform_publish_period: 0.02
 
-    # -------------------------------------------------------------------------
-    # map_update_interval: how often the occupancy grid is rebuilt (seconds).
-    # Reduced from 5.0 -> 3.0 so the displayed map stays visually current
-    # during exploration. Does not affect scan matching frequency.
-    # -------------------------------------------------------------------------
+    # map_update_interval: how often the occupancy grid is rebuilt (s).
     map_update_interval: 3.0
 
     resolution: 0.05
@@ -55,32 +40,23 @@ slam_toolbox:
     # -------------------------------------------------------------------------
     # minimum_travel_distance / minimum_travel_heading
     #
-    # SLAM Toolbox only runs a scan match after the robot has moved at least
-    # this far OR rotated at least this much since the last match.
+    # SLAM only runs a scan match after the robot has moved at least this
+    # far OR rotated at least this much since the last match.
     #
-    # Previous values (0.5 m / 0.5 rad) were too large:
-    #   - SLAM buffered many scans between matches
-    #   - When thresholds were finally crossed, a single large map->odom
-    #     correction was applied all at once -> visible map jump/rotation in
-    #     RViz when odom is the fixed frame
-    #   - Between matches, odometry error (4-wheel turning geometry) accumulated
-    #     unchecked, causing gradual map drift/rotation
-    #
-    # New values (0.1 m / 0.2 rad ~11 deg):
-    #   - Scan matches fire more frequently -> smaller, smoother corrections
-    #   - Map->odom TF stays stable; no visible rotation bursts in RViz
-    #   - Slight CPU cost increase — acceptable on a laptop running Gazebo
-    #   - If you see SLAM CPU spike, raise minimum_travel_distance to 0.2
+    # minimum_travel_heading raised from 0.2 -> 0.3 rad (~17 deg).
+    # With the wheel friction fix, the robot no longer accumulates phantom
+    # yaw. Small heading wobbles (< 0.3 rad) from Ignition joint-velocity
+    # noise no longer trigger a scan match and a subsequent map->odom
+    # correction. If you see the map drift during slow rotations, lower
+    # back to 0.2. If you see jumps on every small turn, raise to 0.35.
     # -------------------------------------------------------------------------
     minimum_travel_distance: 0.1
-    minimum_travel_heading: 0.2
+    minimum_travel_heading: 0.3
 
-    # -------------------------------------------------------------------------
-    # transform_timeout: how long SLAM waits for a TF lookup before giving up.
-    # Increased from 0.2 -> 0.3 s to tolerate brief TF gaps on slower machines
-    # or when the 5s fixer delay causes a momentary /scan_fixed dropout.
-    # -------------------------------------------------------------------------
-    transform_timeout: 0.3
+    # transform_timeout: how long SLAM waits for TF before giving up.
+    # 0.5s gives extra margin now that controller_manager runs at 100 Hz
+    # (10ms cycle) instead of 1000 Hz, ensuring no TF gaps under load.
+    transform_timeout: 0.5
 
     tf_buffer_duration: 30.0
     stack_size_to_use: 40000000
@@ -114,20 +90,25 @@ slam_toolbox:
     # -------------------------------------------------------------------------
     # Scan Matcher variance penalties
     #
-    # angle_variance_penalty: penalises large rotational corrections during
-    # scan matching. Previous value of 1.0 was too permissive — SLAM was
-    # applying large yaw corrections on every scan match, causing the map
-    # frame to visibly rotate in RViz.
+    # angle_variance_penalty raised from 1.5 -> 2.5.
+    # This is the most critical parameter for stopping map->odom yaw jumps.
+    # A higher value means SLAM demands much stronger scan evidence before
+    # applying any rotational correction to map->odom.
     #
-    # Increased to 1.5: SLAM now requires stronger scan match evidence before
-    # applying a rotational correction. Works together with the tighter
-    # minimum_travel_heading (0.2 rad) to keep map->odom stable.
+    # The chain of fixes:
+    #   1. Wheel friction (left/right_wheels.xacro) eliminates phantom yaw
+    #      from the physics simulation. Odom yaw is now trustworthy.
+    #   2. controller update_rate:100 keeps Gazebo at RTF~1.0, keeping
+    #      timestamps in sync. No more TF lookup failures.
+    #   3. angle_variance_penalty:2.5 + minimum_travel_heading:0.3 ensure
+    #      SLAM only applies yaw corrections when it has accumulated
+    #      significant heading change AND has strong scan match evidence.
     #
-    # If walls appear slightly skewed in the map, decrease back toward 1.0.
-    # If map still rotates, increase toward 2.0.
+    # If walls appear skewed in the final map, decrease toward 2.0.
+    # If map still rotates during straight driving, increase toward 3.0.
     # -------------------------------------------------------------------------
     distance_variance_penalty: 0.5
-    angle_variance_penalty: 1.5
+    angle_variance_penalty: 2.5
 
     fine_search_angle_offset: 0.00349
     coarse_search_angle_offset: 0.349

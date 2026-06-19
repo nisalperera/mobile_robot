@@ -53,13 +53,49 @@
         </xacro:inertial_cylinder>
     </link>
 
+    <!-- ---------------------------------------------------------------
+         Ignition Gazebo friction + contact properties for left wheels.
+
+         mu  (ODE mu1) = 1.0  - forward/rolling friction coefficient.
+             Rubber-on-concrete typical value. Prevents the wheel from
+             sliding forward/backward under torque.
+
+         mu2 (ODE mu2) = 0.5  - lateral friction coefficient.
+             Lower than mu1 to allow the realistic lateral scrub a
+             4-wheel skid-steer robot experiences during turns.
+             If set to 1.0, turning resistance is too high and the
+             robot yaws less than commanded -> odom yaw underestimates.
+             If set to 0.0, wheels slide sideways freely -> phantom
+             lateral velocity in odometry -> SLAM map->odom drift.
+
+         kp  = 1e6 N/m - contact stiffness (spring constant).
+             High enough that wheels don't visibly sink into the ground
+             plane but low enough to avoid physics instability.
+
+         kd  = 1.0 N·s/m - contact damping.
+             Damps bounce at contact. Without this the robot can
+             oscillate vertically after spawn, corrupting the first
+             few odom samples and causing SLAM startup jump.
+
+         minDepth = 0.001 m - minimum contact depth before friction
+             applies. Prevents jitter from micro-penetrations.
+    ---------------------------------------------------------------- -->
+    <gazebo reference="front_left_wheel">
+        <material>Gazebo/Black</material>
+        <mu>1.0</mu>
+        <mu2>0.5</mu2>
+        <kp>1000000.0</kp>
+        <kd>1.0</kd>
+        <minDepth>0.001</minDepth>
+    </gazebo>
 
     <gazebo reference="rear_left_wheel">
         <material>Gazebo/Black</material>
-    </gazebo>
-
-    <gazebo reference="front_left_wheel">
-        <material>Gazebo/Black</material>
+        <mu>1.0</mu>
+        <mu2>0.5</mu2>
+        <kp>1000000.0</kp>
+        <kd>1.0</kd>
+        <minDepth>0.001</minDepth>
     </gazebo>
 
 </robot>
