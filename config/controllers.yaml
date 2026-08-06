@@ -110,6 +110,22 @@ diff_drive_controller:
     pose_covariance_diagonal:  [0.001, 0.001, 1e-9, 1e-9, 1e-9, 0.01]
     twist_covariance_diagonal: [0.001, 1e-9,  1e-9, 1e-9, 1e-9, 0.01]
 
+    linear:
+      x:
+        has_velocity_limits: true
+        max_velocity: 1.0      # m/s
+        min_velocity: -1.0     # m/s
+        has_acceleration_limits: true
+        max_acceleration: 1.0  # m/s^2
+        min_acceleration: -1.0 # m/s^2
+
+    angular:
+      z:
+        has_velocity_limits: true
+        max_velocity: 1.0      # rad/s  (set your own value here)
+        has_acceleration_limits: true
+        max_acceleration: 1.0  # rad/s^2
+
 joint_state_broadcaster:
   ros__parameters:
     publish_rate: 50.0

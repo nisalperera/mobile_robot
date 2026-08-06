@@ -115,10 +115,10 @@ def generate_launch_description():
     # IMU complementary filter (real robot only)
     # Fuses raw IMU data from the hardware driver into an orientation estimate.
     # In simulation the Ignition IMU plugin outputs a complete Imu message
-    # (angular velocity + linear acceleration) on /imu so no filter is needed.
+    # (angular velocity + linear acceleration) on /imu_fixed so no filter is needed.
     #
-    # Hardware driver is expected to publish sensor_msgs/msg/Imu on /imu/data_raw.
-    # The filter node re-publishes the filtered result on /imu/data.
+    # Hardware driver is expected to publish sensor_msgs/msg/imu_fixed on /imu_fixed/data_raw.
+    # The filter node re-publishes the filtered result on /imu_fixed/data.
     #
     # Install: sudo apt install ros-foxy-imu-complementary-filter
     # -------------------------------------------------------------------------
@@ -131,8 +131,8 @@ def generate_launch_description():
         condition=UnlessCondition(sim_mode),
         parameters=[imu_filter_params],
         remappings=[
-            ('/imu/data_raw', '/imu/data_raw'),
-            ('/imu/data',     '/imu/data'),
+            ('/imu_fixed/data_raw', '/imu_fixed/data_raw'),
+            ('/imu_fixed/data',     '/imu_fixed/data'),
         ],
     )
 

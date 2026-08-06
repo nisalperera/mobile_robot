@@ -25,8 +25,8 @@
           freezing the robot while IMU data still publishes normally.
 
         Topic pipeline (simulation):
-          Ignition sensor  ->  /imu  (ignition topic)
-          ros_gz_bridge    ->  /imu  (ROS sensor_msgs/Imu, raw)
+          Ignition sensor  ->  /imu_fixed  (ignition topic)
+          ros_gz_bridge    ->  /imu_fixed  (ROS sensor_msgs/imu_fixed, raw)
           imu_frame_fixer  ->  /imu_fixed  (frame_id rewritten to 'imu_link')
 
         Noise model:
@@ -83,7 +83,7 @@
 
         <frame_id> is set here as a hint; the actual frame_id in the
         published Ignition message will still be the namespaced path
-        (mobile_robot/base_footprint/imu_link). The imu_frame_fixer node
+        (mobile_robot/base_footprint/imu_fixed_link). The imu_frame_fixer node
         in gz.launch.py rewrites it to 'imu_link' before any ROS consumer
         sees the message.
     -->
