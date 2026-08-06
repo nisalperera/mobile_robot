@@ -281,16 +281,18 @@ def generate_launch_description():
             '/imu',
             '/imu_fixed',
             'sensor_msgs/msg/Imu',
+            # Ignition IMU plugin omits covariance output; hardcode variances
+            # from description/xacro/imu.xacro noise stddev values.
             "sensor_msgs.msg.Imu("
             "header=std_msgs.msg.Header("
             "stamp=m.header.stamp, "
             "frame_id='imu_link'), "
             "orientation=m.orientation, "
-            "orientation_covariance=m.orientation_covariance, "
+            "orientation_covariance=[-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "
             "angular_velocity=m.angular_velocity, "
-            "angular_velocity_covariance=m.angular_velocity_covariance, "
+            "angular_velocity_covariance=[2.5e-5, 0.0, 0.0, 0.0, 2.5e-5, 0.0, 0.0, 0.0, 2.5e-5], "
             "linear_acceleration=m.linear_acceleration, "
-            "linear_acceleration_covariance=m.linear_acceleration_covariance)",
+            "linear_acceleration_covariance=[1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4])",
             '--import', 'sensor_msgs', 'std_msgs',
         ],
         output='screen',
