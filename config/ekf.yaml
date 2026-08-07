@@ -62,12 +62,15 @@ ekf_filter_node:
     #        vroll  vpitch vyaw
     #        ax     ay     az
     #
-    # For wheel odom we trust: vx (forward velocity) and vyaw (yaw rate).
-    # We do NOT fuse absolute pose (x, y, yaw) from odom — that would lock
-    # the filter to the potentially-drifting encoder estimate.
+    # odom0: which states to USE from this message.
+    # We use: vx (forward velocity) and vyaw (yaw rate) from wheel odometry.
+    # We do NOT fuse absolute pose (x, y, yaw) — that would lock the filter
+    # to the potentially-drifting encoder estimate. We do NOT fuse vy either
+    # — the robot is nonholonomic (differential drive), so lateral velocity
+    # is always ~0 and provides no useful correction signal.
     odom0_config: [false, false, false,
                    false, false, false,
-                   true,  true,  false,
+                   true,  false, false,
                    false, false, true,
                    false, false, false]
 
@@ -89,20 +92,18 @@ ekf_filter_node:
 
     # imu0_config: which states to USE from this message.
     # We use:
-    #   - vyaw  (angular velocity z): direct IMU yaw rate is more accurate
+    #   - vyaw (angular velocity z): direct IMU yaw rate is more accurate
     #            than wheel-encoder-derived yaw rate during turns.
     #   - ax    (linear acceleration x): helps estimate forward velocity
     #            between encoder updates.
-    #
-    # We do NOT use absolute orientation (yaw) from the IMU because:
-    #   - imu_complementary_filter with gain_mag: 0.0 has no magnetometer
-    #     reference, so absolute yaw drifts over time.
-    #   - Using relative angular velocity is sufficient and more stable.
+    # We do NOT use absolute orientation (yaw) from the IMU because
+    # imu_complementary_filter with gain_mag: 0.0 has no magnetometer
+    # reference, so absolute yaw drifts over time.
     imu0_config: [false, false, false,
                   false, false, false,
                   false, false, false,
                   false, false, true,
-                  false, false, false]
+                  true,  false, false]
 
     imu0_differential: false
     imu0_relative: false

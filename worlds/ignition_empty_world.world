@@ -14,7 +14,10 @@
     <plugin filename="libignition-gazebo-user-commands-system.so"
             name="ignition::gazebo::systems::UserCommands"/>
     <plugin filename="libignition-gazebo-scene-broadcaster-system.so"
-            name="ignition::gazebo::systems::SceneBroadcaster"/>
+            name="ignition::gazebo::systems::SceneBroadcaster">
+        <dynamic_pose_hertz>60</dynamic_pose_hertz>
+        <state_hertz>60</state_hertz>
+    </plugin>
 
     <!--
       Sensors system plugin — MANDATORY for ANY sensor to publish data.
