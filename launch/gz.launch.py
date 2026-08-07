@@ -62,7 +62,7 @@ def log_args(context, *args, **kwargs):
     logger.info(
         f"[gz.launch.py] "
         f"use_sim_time={LaunchConfiguration('use_sim_time').perform(context)} "
-        f"use_ros2_control={LaunchConfiguration('use_ros2_control').perform(context)} "
+        # f"use_ros2_control={LaunchConfiguration('use_ros2_control').perform(context)} "
         f"headless={LaunchConfiguration('headless').perform(context)} "
         f"world={LaunchConfiguration('world').perform(context)}"
     )
@@ -139,7 +139,7 @@ def generate_launch_description():
     package_name = 'mobile_robot'
 
     use_sim_time = LaunchConfiguration('use_sim_time')
-    use_ros2_control = LaunchConfiguration('use_ros2_control')
+    # use_ros2_control = LaunchConfiguration('use_ros2_control')
 
     spawn_entity = Node(
         package='ros_gz_sim',
@@ -171,7 +171,7 @@ def generate_launch_description():
             '/imu@sensor_msgs/msg/Imu[ignition.msgs.IMU',
         ],
         remappings=[
-            ('/model/mobile_robot/odometry', '/diff_drive_controller/odom'),
+            # ('/model/mobile_robot/odometry', '/diff_drive_controller/odom'),
             ('/model/mobile_robot/cmd_vel',  '/diff_drive_controller/cmd_vel_unstamped'),
         ],
         output='screen',
@@ -335,10 +335,10 @@ def generate_launch_description():
             'use_sim_time',
             default_value='true',
             description='Use simulation clock if true'),
-        DeclareLaunchArgument(
-            'use_ros2_control',
-            default_value='true',
-            description='Use ros2_control if true'),
+        # DeclareLaunchArgument(
+        #     'use_ros2_control',
+        #     default_value='true',
+        #     description='Use ros2_control if true'),
         DeclareLaunchArgument(
             'use_slam',
             default_value='false',
