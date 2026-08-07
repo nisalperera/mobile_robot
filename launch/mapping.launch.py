@@ -19,7 +19,7 @@ use_sim_time    : true (default) | false
 use_ros2_control: true (default) | false
 headless        : true (default) | false
     true  → does not launch RViz.
-world           : world name or absolute path (default: ignition_world)
+world           : world name or absolute path (default: ignition_empty_world)
     Name is resolved to <pkg_share>/worlds/<name>.world automatically.
     e.g. world:=house_world  or  world:=/tmp/my_arena.world
 
@@ -264,7 +264,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'world',
-            default_value='ignition_world',
+            default_value='ignition_empty_world',
             description=(
                 'World to load in Gazebo. Accepts a name from worlds/ or an '
                 'absolute path. e.g. world:=house_world'

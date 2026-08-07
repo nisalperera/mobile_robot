@@ -349,7 +349,7 @@ def generate_launch_description():
             description='Run Gazebo without GUI if true'),
         DeclareLaunchArgument(
             'world',
-            default_value='ignition_world',
+            default_value='ignition_empty_world',
             description=(
                 'World to load. Accepts either:\n'
                 '  - A world name (file stem) from the worlds/ directory,\n'

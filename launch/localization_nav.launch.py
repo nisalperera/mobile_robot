@@ -282,7 +282,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'world',
-            default_value='ignition_world',
+            default_value='ignition_empty_world',
             description=(
                 'World to load in Gazebo. Accepts a name from worlds/ or an '
                 'absolute path. e.g. world:=house_world'
