@@ -58,6 +58,18 @@ restarted a second later, by which point the input topic is reliably
 publishing.
 
 
+BUGFIX (map-rotation-fix, cont.): the root cause of the slow/unreliable
+rendering on hybrid-GPU laptops (AMD iGPU + NVIDIA dGPU) is that
+Ignition defaults to the AMD driver stack, which can fail to initialize
+hardware acceleration entirely and fall back to software rendering.
+The 'ign gazebo' process now sets NVIDIA PRIME render offload env vars
+(__NV_PRIME_RENDER_OFFLOAD=1, __GLX_VENDOR_LIBRARY_NAME=nvidia) so
+rendering is forced onto the NVIDIA GPU automatically, without the user
+needing to export these in their shell every session. See:
+https://gazebosim.org/docs/latest/troubleshooting/ (Hybrid Intel/Nvidia
+systems).
+
+
 World selection:
   Pass world:=<name>  to load a different world at runtime.
     world:=ignition_world   (default, simple 6x6 room)
@@ -168,6 +180,13 @@ def launch_gazebo(context, *args, **kwargs):
         additional_env={
             'IGN_GAZEBO_SYSTEM_PLUGIN_PATH': plugin_paths,
             'IGN_GAZEBO_RESOURCE_PATH':      resource_paths,
+            # BUGFIX (map-rotation-fix): force rendering onto the NVIDIA
+            # discrete GPU via PRIME render offload. Without this,
+            # Ignition defaults to the AMD integrated GPU driver stack,
+            # which on this hardware fails to initialize hardware
+            # acceleration and falls back to slow software rendering.
+            '__NV_PRIME_RENDER_OFFLOAD': '1',
+            '__GLX_VENDOR_LIBRARY_NAME': 'nvidia',
         }
     )
     return [gazebo]
