@@ -1,6 +1,8 @@
 """gz.launch.py
 
+
 Ignition Gazebo simulation launcher.
+
 
 Ignition Fortress sensor frame_id namespacing issue:
   All sensors get header.frame_id set to their fully-namespaced internal
@@ -10,12 +12,15 @@ Ignition Fortress sensor frame_id namespacing issue:
                'mobile_robot/base_footprint/right_camera'
     imu     -> 'mobile_robot/base_footprint/imu_link'
 
+
   The ROS TF tree only knows the URDF link names:
     'laser_frame', 'left_camera_link_optical', 'right_camera_link_optical',
     'imu_link'
 
+
   RViz and SLAM Toolbox drop every message because the frame_id never
   resolves in TF.
+
 
 Fix: topic_tools transform nodes rewrite frame_id on each sensor topic
 before any ROS node sees it:
@@ -24,15 +29,34 @@ before any ROS node sees it:
   /right_camera/image -> /right_camera/image_fixed (frame_id: right_camera_link_optical)
   /imu                -> /imu_fixed                (frame_id: imu_link)
 
-All four fixers are delayed by 5 s (TimerAction) so that:
+
+All four fixers are delayed by 8 s (TimerAction) so that:
   1. ros_gz_bridge has connected to Ignition and is publishing
   2. The robot has been spawned by ros_gz_sim create
   3. Controller spawners have fired (also at 5 s)
 before any topic_tools/transform node tries to subscribe.
 
+
 Without a delay, topic_tools exits immediately with 'no publisher'
 if the input topic is not yet live, and /scan_fixed / /imu_fixed
 never publish for the lifetime of the session.
+
+
+BUGFIX (map-rotation-fix): a fixed delay alone is not fully reliable.
+On machines where Ignition falls back to software rendering (no working
+GPU acceleration -- e.g. 'amdgpu_device_initialize failed' / 'libGL
+error: failed to load driver'), camera sensor plugins can take longer
+than the delay to publish their first frame, and ros2_control init can
+also run close to the delay boundary. When that happens the fixer for
+that topic loses the race, topic_tools/transform exits, and the '_fixed'
+topic never publishes for the rest of the session (e.g. right camera
+showing nothing in RViz, or the IMU fixer dying at startup).
+
+All four fixer nodes now set respawn=True with a short respawn_delay,
+so a fixer that loses the race on its first attempt is automatically
+restarted a second later, by which point the input topic is reliably
+publishing.
+
 
 World selection:
   Pass world:=<name>  to load a different world at runtime.
@@ -41,8 +65,10 @@ World selection:
     world:=/abs/path/to.world  (absolute path for external worlds)
 """
 
+
 import logging
 import os
+
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -55,7 +81,9 @@ from launch.actions import (
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+
 logger = logging.getLogger('launch')
+
 
 
 def log_args(context, *args, **kwargs):
@@ -68,8 +96,10 @@ def log_args(context, *args, **kwargs):
     )
 
 
+
 def _resolve_world_path(context):
     """Resolve the 'world' launch arg to an absolute .world file path.
+
 
     Accepts two forms:
       1. A plain name (no path separators, no extension), e.g. 'house_world'
@@ -77,10 +107,12 @@ def _resolve_world_path(context):
       2. An absolute path, e.g. '/tmp/my_arena.world'
          -> used as-is
 
+
     Raises FileNotFoundError if the resolved path does not exist so the
     error is clear rather than Ignition silently loading an empty world.
     """
     world_arg = LaunchConfiguration('world').perform(context)
+
 
     if os.path.isabs(world_arg):
         world_file = world_arg
@@ -88,6 +120,7 @@ def _resolve_world_path(context):
         pkg_share = get_package_share_directory('mobile_robot')
         name = world_arg if world_arg.endswith('.world') else f'{world_arg}.world'
         world_file = os.path.join(pkg_share, 'worlds', name)
+
 
     if not os.path.isfile(world_file):
         raise FileNotFoundError(
@@ -101,8 +134,10 @@ def _resolve_world_path(context):
             )
         )
 
+
     logger.info(f'[gz.launch.py] Loading world: {world_file}')
     return world_file
+
 
 
 def launch_gazebo(context, *args, **kwargs):
@@ -111,8 +146,10 @@ def launch_gazebo(context, *args, **kwargs):
     gz_args = f'-r -s --force-version 6 {world_file}' if headless \
                  else f'-r --force-version 6 {world_file}'
 
+
     existing_plugin_path = os.environ.get('IGN_GAZEBO_SYSTEM_PLUGIN_PATH', '')
     existing_resource_path = os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')
+
 
     plugin_paths = ':'.join(filter(None, [
         '/opt/ros/humble/lib',
@@ -123,6 +160,7 @@ def launch_gazebo(context, *args, **kwargs):
         '/usr/share/ignition/ignition-gazebo6',
         existing_resource_path,
     ]))
+
 
     gazebo = ExecuteProcess(
         cmd=['ign', 'gazebo'] + gz_args.split(),
@@ -135,11 +173,14 @@ def launch_gazebo(context, *args, **kwargs):
     return [gazebo]
 
 
+
 def generate_launch_description():
     package_name = 'mobile_robot'
 
+
     use_sim_time = LaunchConfiguration('use_sim_time')
     # use_ros2_control = LaunchConfiguration('use_ros2_control')
+
 
     spawn_entity = Node(
         package='ros_gz_sim',
@@ -151,6 +192,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
     )
+
 
     # -------------------------------------------------------------------------
     # Topic bridge: Ignition <-> ROS2
@@ -178,21 +220,28 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
+
     # =========================================================================
-    # Frame-id fixers — ALL delayed by 5 s
+    # Frame-id fixers
     #
-    # CRITICAL: topic_tools/transform exits silently if the input topic has
-    # no publisher when the node starts. Starting fixers immediately caused
-    # /scan_fixed to never publish (SLAM gets no scans -> no /map).
+    # CRITICAL: topic_tools/transform exits (does not retry) if the input
+    # topic has no publisher when the node starts. A fixed startup delay
+    # alone is not fully reliable -- see BUGFIX note in the module
+    # docstring. Each fixer below also sets respawn=True so a fixer that
+    # loses the startup race is automatically restarted shortly after,
+    # once the input topic is reliably publishing.
     #
-    # 5 s covers:
+    # FIXER_DELAY covers the typical case:
     #   ~2 s  Ignition world load + robot spawn
     #   ~1 s  ros_gz_bridge connects to Ignition topics
     #   ~2 s  controller spawners activate (also fired at 5 s)
+    #   +3 s  extra margin for slow/software-rendering machines
     #
-    # If your machine is slow, increase this value.
+    # If your machine is slow, increase this value further.
     # =========================================================================
-    FIXER_DELAY = 5.0
+    FIXER_DELAY = 8.0
+    FIXER_RESPAWN_DELAY = 1.0
+
 
     # --- Lidar ---------------------------------------------------------------
     scan_frame_fixer = Node(
@@ -220,7 +269,10 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+        respawn=True,
+        respawn_delay=FIXER_RESPAWN_DELAY,
     )
+
 
     # --- Left camera ---------------------------------------------------------
     left_camera_frame_fixer = Node(
@@ -245,7 +297,10 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+        respawn=True,
+        respawn_delay=FIXER_RESPAWN_DELAY,
     )
+
 
     # --- Right camera --------------------------------------------------------
     right_camera_frame_fixer = Node(
@@ -270,7 +325,10 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+        respawn=True,
+        respawn_delay=FIXER_RESPAWN_DELAY,
     )
+
 
     # --- IMU -----------------------------------------------------------------
     imu_frame_fixer = Node(
@@ -297,9 +355,12 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+        respawn=True,
+        respawn_delay=FIXER_RESPAWN_DELAY,
     )
 
-    # All fixers share a single TimerAction — 5 s after launch
+
+    # All fixers share a single TimerAction
     delayed_sensor_fixers = TimerAction(
         period=FIXER_DELAY,
         actions=[
@@ -309,6 +370,7 @@ def generate_launch_description():
             imu_frame_fixer,
         ],
     )
+
 
     # -------------------------------------------------------------------------
     # Controller spawners — also at 5 s (robot must be spawned first)
@@ -329,6 +391,7 @@ def generate_launch_description():
         period=5.0,
         actions=[joint_state_broadcaster_spawner, diff_drive_controller_spawner],
     )
+
 
     return LaunchDescription([
         DeclareLaunchArgument(
