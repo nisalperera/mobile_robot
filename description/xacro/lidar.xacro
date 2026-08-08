@@ -24,7 +24,7 @@
     </link>
 
     <!--
-        Ignition Fortress gpu_lidar sensor -- now configured as a 3D LIDAR.
+        Ignition Fortress gpu_lidar sensor, now configured as a 3D LIDAR.
 
         CRITICAL: use <lidar> child element, NOT <ray>.
         <ray> is Gazebo Classic syntax. Ignition silently ignores it,
@@ -34,7 +34,7 @@
         The world-level Sensors plugin (ignition_world.world) drives
         this sensor. No <plugin> block is needed here. render_engine
         ogre2 (set in ignition_world.world) is what GPU-accelerates
-        this sensor -- type="gpu_lidar" rasterizes all rays on the GPU
+        this sensor; type="gpu_lidar" rasterizes all rays on the GPU
         instead of the CPU-based "lidar"/"ray" sensor types.
 
         Coverage (per bugfix/map-rotation-fix -> feature/3d-lidar):
@@ -54,7 +54,7 @@
         single ring and should be treated as a debug/legacy view of
         the bottom-most ring only. Consume full 3D returns from the
         already-bridged /scan/points (sensor_msgs/PointCloud2)
-        instead -- e.g. point Nav2's voxel_layer observation source
+        instead, e.g. point Nav2's voxel_layer observation source
         at /scan/points with data_type: "PointCloud2" rather than
         /scan with data_type: "LaserScan", so obstacles across the
         full 60 deg vertical FOV are marked/cleared.
