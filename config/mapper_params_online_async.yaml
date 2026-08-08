@@ -1,6 +1,7 @@
 slam_toolbox:
   ros__parameters:
 
+
     # Plugin params
     solver_plugin: solver_plugins::CeresSolver
     ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
@@ -8,6 +9,7 @@ slam_toolbox:
     ceres_trust_strategy: LEVENBERG_MARQUARDT
     ceres_dogleg_type: TRADITIONAL_DOGLEG
     ceres_loss_function: None
+
 
     # ROS Parameters
     # odom_frame: The frame published by diff_drive_controller (odom).
@@ -22,20 +24,25 @@ slam_toolbox:
     use_map_saver: true
     mode: mapping
 
+
     debug_logging: false
     throttle_scans: 1
+
 
     # transform_publish_period: how often SLAM publishes map->odom TF (s).
     # 0.02s (50 Hz) keeps RViz and Nav2 fed with a fresh transform between
     # scan matches using odometry extrapolation.
     transform_publish_period: 0.02
 
+
     # map_update_interval: how often the occupancy grid is rebuilt (s).
     map_update_interval: 3.0
+
 
     resolution: 0.05
     min_laser_range: 0.3
     max_laser_range: 12.0
+
 
     # -------------------------------------------------------------------------
     # minimum_travel_distance / minimum_travel_heading
@@ -53,18 +60,22 @@ slam_toolbox:
     minimum_travel_distance: 0.15
     minimum_travel_heading: 0.35
 
+
     # transform_timeout: how long SLAM waits for TF before giving up.
     # 0.5s gives extra margin now that controller_manager runs at 100 Hz
     # (10ms cycle) instead of 1000 Hz, ensuring no TF gaps under load.
     transform_timeout: 0.5
 
+
     tf_buffer_duration: 30.0
     stack_size_to_use: 40000000
     enable_interactive_mode: true
 
+
     # General Parameters
     use_scan_matching: true
     use_scan_barycenter: true
+
 
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
@@ -77,15 +88,39 @@ slam_toolbox:
     loop_match_minimum_response_coarse: 0.35
     loop_match_minimum_response_fine: 0.45
 
+
+    # -------------------------------------------------------------------------
     # Correlation Parameters
-    correlation_search_space_dimension: 0.5
+    #
+    # BUGFIX (map-rotation-fix): correlation_search_space_dimension raised
+    # from 0.5 -> 1.0 rad (~57 deg).
+    #
+    # This is the angular window (centred on the odometry-predicted pose)
+    # that the scan matcher searches when correcting map->odom. If the
+    # EKF/odometry yaw estimate is off by more than this window at the
+    # moment of a scan match, the matcher cannot find the right alignment
+    # and slam_toolbox effectively treats the observation as a new,
+    # disconnected pose -- producing a rotated map that overlaps the old
+    # one. This is exactly the "past a certain turn angle" symptom.
+    #
+    # This value was raised as a safety margin while the underlying yaw
+    # source is fixed (see BUGFIX note in mapping.launch.py: the sim EKF
+    # node was feeding its own fused output back into its raw-odom input)
+    # and while wheel_separation_multiplier in controllers.yaml is
+    # calibrated via the documented 1-metre-square test. Once odometry
+    # yaw is accurate, this can be lowered back toward 0.5-0.6 for faster
+    # scan matching.
+    # -------------------------------------------------------------------------
+    correlation_search_space_dimension: 1.0
     correlation_search_space_resolution: 0.01
     correlation_search_space_smear_deviation: 0.1
+
 
     # Loop Closure Parameters
     loop_search_space_dimension: 8.0
     loop_search_space_resolution: 0.05
     loop_search_space_smear_deviation: 0.03
+
 
     # -------------------------------------------------------------------------
     # Scan Matcher variance penalties
@@ -103,12 +138,16 @@ slam_toolbox:
     #   3. angle_variance_penalty:2.5 + minimum_travel_heading:0.3 ensure
     #      SLAM only applies yaw corrections when it has accumulated
     #      significant heading change AND has strong scan match evidence.
+    #   4. EKF sim feedback loop removed + correlation_search_space_dimension
+    #      widened to 1.0 rad (see BUGFIX comment above) so large turns no
+    #      longer fall outside the scan matcher's angular search window.
     #
     # If walls appear skewed in the final map, decrease toward 2.0.
     # If map still rotates during straight driving, increase toward 3.0.
     # -------------------------------------------------------------------------
     distance_variance_penalty: 0.5
     angle_variance_penalty: 3.0
+
 
     fine_search_angle_offset: 0.00349
     coarse_search_angle_offset: 0.349
