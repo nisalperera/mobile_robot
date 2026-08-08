@@ -12,14 +12,6 @@
             <geometry>
                 <cylinder radius="0.05" length="0.04"/>
             </geometry>
-            <material name="red"/>
-        </visual>
-        <visual>
-            <origin xyz="0 0 -0.05"/>
-            <geometry>
-                <cylinder radius="0.01" length="0.1"/>
-            </geometry>
-            <material name="black"/>
         </visual>
         <collision>
             <geometry>
@@ -32,7 +24,7 @@
     </link>
 
     <!--
-        Ignition Fortress gpu_lidar sensor.
+        Ignition Fortress gpu_lidar sensor -- now configured as a 3D LIDAR.
 
         CRITICAL: use <lidar> child element, NOT <ray>.
         <ray> is Gazebo Classic syntax. Ignition silently ignores it,
@@ -40,10 +32,32 @@
         are ever published.
 
         The world-level Sensors plugin (ignition_world.world) drives
-        this sensor. No <plugin> block is needed here.
+        this sensor. No <plugin> block is needed here. render_engine
+        ogre2 (set in ignition_world.world) is what GPU-accelerates
+        this sensor -- type="gpu_lidar" rasterizes all rays on the GPU
+        instead of the CPU-based "lidar"/"ray" sensor types.
+
+        Coverage (per bugfix/map-rotation-fix -> feature/3d-lidar):
+          Horizontal: 172 deg total, centered on the robot's front
+            (+X of laser_frame), i.e. +/-86 deg = +/-1.500983 rad.
+          Vertical:   60 deg total. Rays START at the LIDAR's own
+            level (0 rad = the horizontal plane through the sensor,
+            perpendicular to the sensor's vertical axis) and sweep
+            UP to +60 deg (1.047198 rad). min_vertical_angle is 0,
+            NOT -30/+30, so no rays point below the sensor's plane.
 
         Topic: Ignition publishes on global /scan (confirmed via ign topic -l).
         Bridge maps Ignition /scan -> ROS /scan in ros_gz_bridge.yaml.
+
+        NOTE: With >1 vertical sample this is a true 3D point cloud.
+        The bridged sensor_msgs/LaserScan on /scan can only carry a
+        single ring and should be treated as a debug/legacy view of
+        the bottom-most ring only. Consume full 3D returns from the
+        already-bridged /scan/points (sensor_msgs/PointCloud2)
+        instead -- e.g. point Nav2's voxel_layer observation source
+        at /scan/points with data_type: "PointCloud2" rather than
+        /scan with data_type: "LaserScan", so obstacles across the
+        full 60 deg vertical FOV are marked/cleared.
     -->
     <gazebo reference="laser_frame">
         <material>Gazebo/Red</material>
@@ -58,11 +72,17 @@
             <lidar>
                 <scan>
                     <horizontal>
-                        <samples>360</samples>
+                        <samples>345</samples>
                         <resolution>1</resolution>
-                        <min_angle>-3.14159</min_angle>
-                        <max_angle>3.14159</max_angle>
+                        <min_angle>-1.500983</min_angle>
+                        <max_angle>1.500983</max_angle>
                     </horizontal>
+                    <vertical>
+                        <samples>16</samples>
+                        <resolution>1</resolution>
+                        <min_angle>0.0</min_angle>
+                        <max_angle>1.047198</max_angle>
+                    </vertical>
                 </scan>
                 <range>
                     <min>0.3</min>
