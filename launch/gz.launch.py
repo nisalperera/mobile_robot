@@ -62,10 +62,9 @@ BUGFIX (map-rotation-fix, cont.): the root cause of the slow/unreliable
 rendering on hybrid-GPU laptops (AMD iGPU + NVIDIA dGPU) is that
 Ignition defaults to the AMD driver stack, which can fail to initialize
 hardware acceleration entirely and fall back to software rendering.
-The 'ign gazebo' process now sets NVIDIA PRIME render offload env vars
-(__NV_PRIME_RENDER_OFFLOAD=1, __GLX_VENDOR_LIBRARY_NAME=nvidia) so
-rendering is forced onto the NVIDIA GPU automatically, without the user
-needing to export these in their shell every session. See:
+Set launch arg nvidia_prime:=true to add NVIDIA PRIME render offload env
+vars (__NV_PRIME_RENDER_OFFLOAD=1, __GLX_VENDOR_LIBRARY_NAME=nvidia) on
+those systems. Leave false on machines without NVIDIA drivers. See:
 https://gazebosim.org/docs/latest/troubleshooting/ (Hybrid Intel/Nvidia
 systems).
 
@@ -104,6 +103,7 @@ def log_args(context, *args, **kwargs):
         f"use_sim_time={LaunchConfiguration('use_sim_time').perform(context)} "
         # f"use_ros2_control={LaunchConfiguration('use_ros2_control').perform(context)} "
         f"headless={LaunchConfiguration('headless').perform(context)} "
+        f"nvidia_prime={LaunchConfiguration('nvidia_prime').perform(context)} "
         f"world={LaunchConfiguration('world').perform(context)}"
     )
 
@@ -155,6 +155,7 @@ def _resolve_world_path(context):
 def launch_gazebo(context, *args, **kwargs):
     world_file = _resolve_world_path(context)
     headless = LaunchConfiguration('headless').perform(context).lower() == 'true'
+    nvidia_prime = LaunchConfiguration('nvidia_prime').perform(context).lower() == 'true'
     gz_args = f'-r -s --force-version 6 {world_file}' if headless \
                  else f'-r --force-version 6 {world_file}'
 
@@ -174,20 +175,22 @@ def launch_gazebo(context, *args, **kwargs):
     ]))
 
 
+    additional_env = {
+        'IGN_GAZEBO_SYSTEM_PLUGIN_PATH': plugin_paths,
+        'IGN_GAZEBO_RESOURCE_PATH':      resource_paths,
+    }
+    if nvidia_prime:
+        # Enable only on hybrid Intel/AMD+NVIDIA laptops where Ignition
+        # otherwise falls back to software rendering.
+        additional_env.update({
+            '__NV_PRIME_RENDER_OFFLOAD': '1',
+            '__GLX_VENDOR_LIBRARY_NAME': 'nvidia',
+        })
+
     gazebo = ExecuteProcess(
         cmd=['ign', 'gazebo'] + gz_args.split(),
         output='screen',
-        additional_env={
-            'IGN_GAZEBO_SYSTEM_PLUGIN_PATH': plugin_paths,
-            'IGN_GAZEBO_RESOURCE_PATH':      resource_paths,
-            # BUGFIX (map-rotation-fix): force rendering onto the NVIDIA
-            # discrete GPU via PRIME render offload. Without this,
-            # Ignition defaults to the AMD integrated GPU driver stack,
-            # which on this hardware fails to initialize hardware
-            # acceleration and falls back to slow software rendering.
-            '__NV_PRIME_RENDER_OFFLOAD': '1',
-            '__GLX_VENDOR_LIBRARY_NAME': 'nvidia',
-        }
+        additional_env=additional_env,
     )
     return [gazebo]
 
@@ -429,6 +432,10 @@ def generate_launch_description():
             'headless',
             default_value='true',
             description='Run Gazebo without GUI if true'),
+        DeclareLaunchArgument(
+            'nvidia_prime',
+            default_value='false',
+            description='Set true only on hybrid Intel/AMD+NVIDIA systems needing PRIME offload'),
         DeclareLaunchArgument(
             'world',
             default_value='ignition_empty_world',
