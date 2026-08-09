@@ -13,7 +13,31 @@ def generate_launch_description():
     lidar's own scan plane (laser_frame z ~ 0), i.e. the bottom-most
     ring where vertical angle ~ 0 rad, matching the "rays start at the
     LIDAR's own level" geometry configured in description/xacro/lidar.xacro.
+
+    ignition_laser_frame_bridge: Ignition's gpu_lidar publishes /scan and
+    /scan/points with frame_id 'mobile_robot/base_footprint/laser' -- an
+    internal Ignition-namespaced name that does NOT exist anywhere in the
+    URDF-derived TF tree published by robot_state_publisher (which only
+    knows 'laser_frame'). scan_frame_fixer (in gz.launch.py) rewrites this
+    at the MESSAGE level for /scan -> /scan_fixed, but there is no
+    equivalent fixer for /scan/points. Without a TF link, any consumer of
+    the raw /scan/points (RViz's PointCloud2 display, and this node's own
+    tf2 buffer lookup for target_frame 'laser_frame') can never resolve
+    the transform and will spin forever with "queue is full" drops. This
+    static, zero-offset publisher declares the two frame names equivalent
+    at the TF level, fixing all consumers of /scan/points at once without
+    needing a second per-topic frame-rewriting node.
     """
+    ignition_laser_frame_bridge = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='ignition_laser_frame_bridge',
+        arguments=[
+            '0', '0', '0', '0', '0', '0',
+            'laser_frame', 'mobile_robot/base_footprint/laser',
+        ],
+    )
+
     pointcloud_to_laserscan_node = Node(
         package='pointcloud_to_laserscan',
         executable='pointcloud_to_laserscan_node',
@@ -40,5 +64,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        ignition_laser_frame_bridge,
         pointcloud_to_laserscan_node,
     ])
