@@ -12,14 +12,6 @@
             <geometry>
                 <cylinder radius="0.05" length="0.04"/>
             </geometry>
-            <material name="red"/>
-        </visual>
-        <visual>
-            <origin xyz="0 0 -0.05"/>
-            <geometry>
-                <cylinder radius="0.01" length="0.1"/>
-            </geometry>
-            <material name="black"/>
         </visual>
         <collision>
             <geometry>
@@ -32,7 +24,7 @@
     </link>
 
     <!--
-        Ignition Fortress gpu_lidar sensor.
+        Ignition Fortress gpu_lidar sensor, now configured as a 3D LIDAR.
 
         CRITICAL: use <lidar> child element, NOT <ray>.
         <ray> is Gazebo Classic syntax. Ignition silently ignores it,
@@ -40,10 +32,39 @@
         are ever published.
 
         The world-level Sensors plugin (ignition_world.world) drives
-        this sensor. No <plugin> block is needed here.
+        this sensor. No <plugin> block is needed here. render_engine
+        ogre2 (set in ignition_world.world) is what GPU-accelerates
+        this sensor; type="gpu_lidar" rasterizes all rays on the GPU
+        instead of the CPU-based "lidar"/"ray" sensor types.
 
-        Topic: Ignition publishes on global /scan (confirmed via ign topic -l).
-        Bridge maps Ignition /scan -> ROS /scan in ros_gz_bridge.yaml.
+        Coverage (per feature/3d-lidar, updated):
+          Horizontal: 150 deg total, centered on the robot's front
+            (+X of laser_frame), i.e. +/-75 deg = +/-1.308997 rad.
+            690 samples (~0.218 deg/sample), double the previous
+            345-sample density.
+          Vertical:   60 deg total. Rays START at the LIDAR's own
+            level (0 rad = the horizontal plane through the sensor,
+            perpendicular to the sensor's vertical axis) and sweep
+            UP to +60 deg (1.047198 rad). min_vertical_angle is 0,
+            NOT -30/+30, so no rays point below the sensor's plane.
+            32 rings (~1.94 deg/ring), double the previous 16 rings.
+          Total rays/scan: 690 x 32 = 22,080 (4x the original 5,520);
+            watch GPU load on machines without working hardware
+            acceleration, see amdgpu fallback notes in gz.launch.py.
+
+        Topic renamed from 'scan' to 'scan_2d': this sensor has multiple
+        vertical rings, so Ignition's native LaserScan serialization
+        on this topic is degenerate/unusable (LaserScan can only carry
+        one ring). Ignition publishes:
+          - /scan_2d         (ignition.msgs.LaserScan; degenerate 3D dump,
+                               not used directly by any consumer)
+          - /scan_2d/points  (ignition.msgs.PointCloudPacked; the real
+                               3D data, bridged to ROS as PointCloud2)
+        pointcloud_to_laserscan.launch.py consumes /scan_2d/points and
+        republishes a proper single-ring 2D LaserScan on ROS topic
+        /scan, which scan_frame_fixer (in gz.launch.py) then rewrites
+        to /scan_fixed for SLAM Toolbox / Nav2, exactly as it did
+        before this sensor became 3D.
     -->
     <gazebo reference="laser_frame">
         <material>Gazebo/Red</material>
@@ -53,16 +74,22 @@
             <update_rate>10</update_rate>
             <always_on>1</always_on>
             <visualize>false</visualize>
-            <topic>scan</topic>
+            <topic>scan_2d</topic>
             <frame_id>laser_frame</frame_id>
             <lidar>
                 <scan>
                     <horizontal>
-                        <samples>360</samples>
+                        <samples>690</samples>
                         <resolution>1</resolution>
-                        <min_angle>-3.14159</min_angle>
-                        <max_angle>3.14159</max_angle>
+                        <min_angle>-1.308997</min_angle>
+                        <max_angle>1.308997</max_angle>
                     </horizontal>
+                    <vertical>
+                        <samples>32</samples>
+                        <resolution>1</resolution>
+                        <min_angle>0.0</min_angle>
+                        <max_angle>1.047198</max_angle>
+                    </vertical>
                 </scan>
                 <range>
                     <min>0.3</min>

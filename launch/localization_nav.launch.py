@@ -1,16 +1,19 @@
 """localization_nav.launch.py
 
+
 Launches the robot in LOCALIZATION + NAVIGATION mode using AMCL + Nav2.
 SLAM Toolbox is NOT started — use mapping.launch.py for mapping.
 A pre-built map MUST exist at the path given by the 'map' argument.
 
+
 Odometry pipeline
 ------------------
   diff_drive_controller --> /odom/raw
-  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu/data
-  robot_localization EKF --> /odom/filtered  (fused, IMU-stabilised)
+  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu_fixed/data
+  robot_localization EKF --> /odom  (fused, IMU-stabilised)
   EKF also publishes the odom -> base_footprint TF (publish_odom_tf: false
   in controllers.yaml so only ONE node writes this transform).
+
 
 Launch arguments
 ----------------
@@ -25,14 +28,17 @@ world           : world name or absolute path (default: ignition_world)
     Name is resolved to <pkg_share>/worlds/<name>.world automatically.
     e.g. world:=house_world  or  world:=/tmp/my_arena.world
 
+
 Example (Laptop — simulation)
 -----------------------------
     ros2 launch mobile_robot localization_nav.launch.py
     ros2 launch mobile_robot localization_nav.launch.py world:=house_world
 
+
     # With a custom map:
     ros2 launch mobile_robot localization_nav.launch.py \\
         world:=house_world map:=/path/to/house_map.yaml
+
 
 Example (Jetson — real robot)
 ------------------------------
@@ -41,9 +47,12 @@ Example (Jetson — real robot)
         map:=/home/jetson/maps/my_map.yaml
 """
 
+
 import os
 
+
 from ament_index_python.packages import get_package_share_directory
+
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
@@ -54,10 +63,13 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
+
 def generate_launch_description():
+
 
     package_name = 'mobile_robot'
     pkg_share = get_package_share_directory(package_name)
+
 
     # ── Launch arguments ────────────────────────────────────────────────
     sim_mode = LaunchConfiguration('sim_mode')
@@ -66,6 +78,7 @@ def generate_launch_description():
     map_yaml = LaunchConfiguration('map')
     headless = LaunchConfiguration('headless')
     world = LaunchConfiguration('world')
+
 
     # ── Robot State Publisher (always runs — sim AND real robot) ────────
     xacro_file = os.path.join(pkg_share, 'description', 'robot.urdf.xacro')
@@ -86,6 +99,7 @@ def generate_launch_description():
         }],
     )
 
+
     # ── Gazebo (sim mode only) ───────────────────────────────────────────
     gazebo_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -100,8 +114,10 @@ def generate_launch_description():
         condition=IfCondition(sim_mode),
     )
 
+
     # ── ros2_control + spawners (real-robot only) ────────────────────────
     controller_params_file = os.path.join(pkg_share, 'config', 'controllers.yaml')
+
 
     control_node = Node(
         package='controller_manager',
@@ -116,9 +132,10 @@ def generate_launch_description():
         respawn=True,
     )
 
+
     # Remap /diff_drive_controller/odom -> /odom/raw so the EKF can
     # subscribe to the raw wheel encoder odometry on a separate topic
-    # from the fused /odom/filtered output that AMCL and Nav2 consume.
+    # from the fused /odom output that AMCL and Nav2 consume.
     diff_drive_spawner = Node(
         package='controller_manager',
         executable='spawner',
@@ -131,6 +148,7 @@ def generate_launch_description():
         ],
     )
 
+
     joint_broad_spawner = Node(
         package='controller_manager',
         executable='spawner',
@@ -140,10 +158,11 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
+
     # ── IMU complementary filter (real robot only) ───────────────────────
-    # In sim mode the Ignition IMU bridge publishes on /imu.
-    # The EKF config expects /imu/data in both modes, so in sim mode
-    # we remap /imu -> /imu/data on the EKF node (see below).
+    # In sim mode the Ignition IMU bridge publishes on /imu_fixed.
+    # The EKF config expects /imu_fixed/data in both modes, so in sim mode
+    # we remap /imu_fixed -> /imu_fixed/data on the EKF node (see below).
     imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter.yaml')
     imu_filter = Node(
         package='imu_complementary_filter',
@@ -153,24 +172,26 @@ def generate_launch_description():
         condition=UnlessCondition(sim_mode),
         parameters=[imu_filter_params, {'use_sim_time': use_sim_time}],
         remappings=[
-            ('/imu/data_raw', '/imu/data_raw'),
-            ('/imu/data',     '/imu/data'),
+            ('/imu_fixed/data_raw', '/imu_fixed/data_raw'),
+            ('/imu_fixed/data',     '/imu_fixed/data'),
         ],
     )
 
+
     # ── EKF (Extended Kalman Filter) ──────────────────────────────────────
-    # Fuses /odom/raw (wheel encoders) + /imu/data (angular velocity)
-    # and publishes the smoothed estimate on /odom/filtered + odom->base_footprint TF.
+    # Fuses /odom/raw (wheel encoders) + /imu_fixed/data (angular velocity)
+    # and publishes the smoothed estimate on /odom + odom->base_footprint TF.
     # AMCL then only has to correct map->odom, not odom->base_footprint,
-    # and Nav2's controllers/planners consume the IMU-stabilised /odom/filtered.
+    # and Nav2's controllers/planners consume the IMU-stabilised /odom.
     #
-    # In sim mode:  Ignition publishes the IMU on /imu (no /imu/data).
-    #               We remap /imu -> /imu/data here so ekf.yaml is
+    # In sim mode:  Ignition publishes the IMU on /imu_fixed (no /imu_fixed/data).
+    #               We remap /imu_fixed -> /imu_fixed/data here so ekf.yaml is
     #               identical in both sim and real-robot modes.
     #
-    # In real mode: imu_complementary_filter already publishes /imu/data
+    # In real mode: imu_complementary_filter already publishes /imu_fixed/data
     #               so no remapping is needed.
     ekf_params_file = os.path.join(pkg_share, 'config', 'ekf.yaml')
+
 
     ekf_node_sim = Node(
         package='robot_localization',
@@ -182,12 +203,13 @@ def generate_launch_description():
         remappings=[
             # Gazebo bridge publishes raw wheel odom on /odom
             ('/odom/raw', '/odom'),
-            # Ignition IMU bridge publishes on /imu, not /imu/data
-            ('/imu/data', '/imu'),
-            # EKF fused output -> /odom/filtered (consumed by AMCL + Nav2)
-            ('odometry/filtered', '/odom/filtered'),
+            # Ignition IMU bridge publishes on /imu_fixed, not /imu_fixed/data
+            ('/imu_fixed/data', '/imu_fixed'),
+            # EKF fused output -> /odom (consumed by AMCL + Nav2)
+            ('odometry/filtered', '/odom'),
         ],
     )
+
 
     ekf_node_real = Node(
         package='robot_localization',
@@ -199,12 +221,13 @@ def generate_launch_description():
         remappings=[
             # diff_drive_spawner remaps /diff_drive_controller/odom -> /odom/raw
             ('/odom/raw', '/odom/raw'),
-            # imu_complementary_filter publishes on /imu/data
-            ('/imu/data', '/imu/data'),
-            # EKF fused output -> /odom/filtered
-            ('odometry/filtered', '/odom/filtered'),
+            # imu_complementary_filter publishes on /imu_fixed/data
+            ('/imu_fixed/data', '/imu_fixed/data'),
+            # EKF fused output -> /odom
+            ('odometry/filtered', '/odom'),
         ],
     )
+
 
     # ── Joystick / teleop ─────────────────────────────────────────────────
     joystick = IncludeLaunchDescription(
@@ -214,6 +237,7 @@ def generate_launch_description():
         launch_arguments={'use_sim_time': use_sim_time}.items(),
     )
 
+
     # ── Twist mux ───────────────────────────────────────────────────────
     twist_mux_params = os.path.join(pkg_share, 'config', 'twist_mux.yaml')
     twist_mux = Node(
@@ -222,6 +246,7 @@ def generate_launch_description():
         parameters=[twist_mux_params, {'use_sim_time': use_sim_time}],
         remappings=[('/cmd_vel_out', '/diff_drive_controller/cmd_vel_unstamped')],
     )
+
 
     # ── AMCL (localization) ────────────────────────────────────────────────
     amcl_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
@@ -236,6 +261,7 @@ def generate_launch_description():
         }.items(),
     )
 
+
     # ── Nav2 stack ─────────────────────────────────────────────────────────
     navigation = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -243,6 +269,7 @@ def generate_launch_description():
         ),
         launch_arguments={'use_sim_time': use_sim_time}.items(),
     )
+
 
     # ── RViz (optional, skip if headless) ───────────────────────────────────
     rviz = IncludeLaunchDescription(
@@ -252,6 +279,7 @@ def generate_launch_description():
         launch_arguments={'use_sim_time': use_sim_time}.items(),
         condition=UnlessCondition(headless),
     )
+
 
     return LaunchDescription([
         # ── Declare args ──────────────────────────────────────────────
@@ -290,7 +318,7 @@ def generate_launch_description():
         ),
         LogInfo(msg=(
             '[localization_nav.launch.py] Mode: LOCALIZATION+NAV — AMCL + Nav2 active, '
-            'EKF fusing /odom/raw + /imu/data -> /odom/filtered, SLAM NOT started.'
+            'EKF fusing /odom/raw + /imu_fixed/data -> /odom, SLAM NOT started.'
         )),
         # ── RSP (all modes) ──────────────────────────────────────────────
         robot_state_publisher,

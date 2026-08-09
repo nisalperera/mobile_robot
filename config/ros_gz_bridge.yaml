@@ -1,4 +1,3 @@
-# ros_gz_bridge.yaml
 #
 # Declarative bridge configuration for ros_gz_bridge parameter_bridge.
 #
@@ -12,11 +11,26 @@
 # (mobile_robot/odom). Bridging those overwrites the correct
 # odom->base_footprint from diff_drive_controller (ros2_control).
 #
-# Lidar topic:
-#   <topic>scan</topic> in lidar.xacro causes Ignition to publish on
-#   the global topic /scan (confirmed via: ign topic -l | grep scan).
-#   Bridge maps Ignition /scan -> ROS /scan.
-#   /scan/points (PointCloud2) is also bridged for optional use in RViz.
+# Lidar topic (feature/3d-lidar):
+#   <topic>scan_2d</topic> in lidar.xacro causes Ignition to publish on
+#   the global topics /scan_2d and /scan_2d/points (confirmed via:
+#   ign topic -l | grep scan). The sensor topic was renamed from 'scan'
+#   because it now has 32 vertical rings (150 deg horiz x 60 deg vert),
+#   and Ignition's native LaserScan serialization can only represent a
+#   single ring -- so /scan_2d (LaserScan) is a degenerate dump not used
+#   by any consumer. /scan_2d/points (PointCloud2) carries the real 3D
+#   data and is consumed by launch/pointcloud_to_laserscan.launch.py,
+#   which republishes a flattened, valid single-ring scan on ROS /scan.
+#   scan_frame_fixer (gz.launch.py) then rewrites that /scan to
+#   /scan_fixed for SLAM Toolbox / Nav2, unchanged from before this
+#   sensor became 3D.
+#
+# NOTE: this YAML file is not currently loaded by any launch file in
+# this package -- gz.launch.py's bridge Node builds its parameter_bridge
+# arguments directly as a CLI arguments list, not via this config file.
+# Keep this file in sync anyway in case a future launch file switches
+# to config-file-based bridging.
+
 
 - ros_topic_name: "/clock"
   gz_topic_name: "/clock"
@@ -24,11 +38,13 @@
   gz_type_name: "ignition.msgs.Clock"
   direction: GZ_TO_ROS
 
+
 - ros_topic_name: "/diff_drive_controller/cmd_vel_unstamped"
   gz_topic_name: "/model/mobile_robot/cmd_vel"
   ros_type_name: "geometry_msgs/msg/Twist"
   gz_type_name: "ignition.msgs.Twist"
   direction: ROS_TO_GZ
+
 
 - ros_topic_name: "/diff_drive_controller/odom"
   gz_topic_name: "/model/mobile_robot/odometry"
@@ -36,19 +52,22 @@
   gz_type_name: "ignition.msgs.Odometry"
   direction: GZ_TO_ROS
 
-# Lidar 2D scan — Ignition publishes on /scan (global, confirmed)
-- ros_topic_name: "/scan"
-  gz_topic_name: "/scan"
+
+# Lidar 3D scan (degenerate LaserScan dump; not used directly by any consumer)
+- ros_topic_name: "/scan_2d"
+  gz_topic_name: "/scan_2d"
   ros_type_name: "sensor_msgs/msg/LaserScan"
   gz_type_name: "ignition.msgs.LaserScan"
   direction: GZ_TO_ROS
 
-# Lidar point cloud (optional — useful for RViz PointCloud2 display)
-- ros_topic_name: "/scan/points"
-  gz_topic_name: "/scan/points"
+
+# Lidar point cloud — real 3D data, consumed by pointcloud_to_laserscan
+- ros_topic_name: "/scan_2d/points"
+  gz_topic_name: "/scan_2d/points"
   ros_type_name: "sensor_msgs/msg/PointCloud2"
   gz_type_name: "ignition.msgs.PointCloudPacked"
   direction: GZ_TO_ROS
+
 
 - ros_topic_name: "/left_camera/image"
   gz_topic_name: "/left_camera/image"
@@ -56,11 +75,13 @@
   gz_type_name: "ignition.msgs.Image"
   direction: GZ_TO_ROS
 
+
 - ros_topic_name: "/left_camera/camera_info"
   gz_topic_name: "/left_camera/camera_info"
   ros_type_name: "sensor_msgs/msg/CameraInfo"
   gz_type_name: "ignition.msgs.CameraInfo"
   direction: GZ_TO_ROS
+
 
 - ros_topic_name: "/right_camera/image"
   gz_topic_name: "/right_camera/image"
@@ -68,8 +89,16 @@
   gz_type_name: "ignition.msgs.Image"
   direction: GZ_TO_ROS
 
+
 - ros_topic_name: "/right_camera/camera_info"
   gz_topic_name: "/right_camera/camera_info"
   ros_type_name: "sensor_msgs/msg/CameraInfo"
   gz_type_name: "ignition.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+
+- ros_topic_name: "imu_fixed"
+  gz_topic_name: "imu_fixed"
+  ros_type_name: "sensor_msgs/msg/Imu"       # was sensor_msgs/msg/imu_fixed
+  gz_type_name: "gz.msgs.IMU"
   direction: GZ_TO_ROS
