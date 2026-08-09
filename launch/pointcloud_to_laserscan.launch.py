@@ -20,25 +20,26 @@ def generate_launch_description():
     own /scan output.
 
     Horizontal FOV/sample count: 150 deg total (+/-75 deg), 690 samples.
-    angle_increment now uses full float precision (not rounded to 6
-    decimals) so the node's internal computed reading count exactly
-    matches 690 -- a rounded increment previously produced 689 readings,
-    which SLAM Toolbox logged as
-    "LaserRangeScan contains 689 range readings, expected 690" on every
-    scan (harmless but noisy).
+
+    BUGFIX (feature/3d-lidar): angle_increment must be FOV / 690, NOT
+    FOV / (690 - 1). pointcloud_to_laserscan computes its output
+    ranges.size() as ceil((angle_max - angle_min) / angle_increment) --
+    a bin-count formula -- whereas Gazebo's gpu_lidar sensor spaces its
+    690 rays using the inclusive-endpoint convention FOV / (samples - 1)
+    (first ray at angle_min, last ray at angle_max). Using the sensor's
+    own per-ray spacing here under-counts the output array by exactly
+    one bin every time (ceil(689.0) = 689), which SLAM Toolbox logged
+    on every single scan as "LaserRangeScan contains 689 range readings,
+    expected 690". Dividing by 690 (not 689) makes
+    ceil((angle_max-angle_min)/angle_increment) == 690 exactly.
 
     QoS (BUGFIX, feature/3d-lidar): topic_tools/transform (scan_frame_fixer
     in gz.launch.py) does NOT accept an explicit output QoS override --
     it auto-discovers the QoS of whatever it is subscribed to and
-    republishes with the same reliability/durability. Since this node's
-    /scan publisher previously had no explicit QoS (defaulting to
-    Reliable), scan_frame_fixer inherited Reliable for /scan_fixed too,
-    and neither RViz's LaserScan/PointCloud displays nor any other
-    Best-Effort ("sensor data") subscriber could ever connect to /scan
-    or /scan_fixed. qos_overrides below forces this node's /scan
-    publisher to Best Effort at the source, so scan_frame_fixer's
-    auto-discovery picks that up and /scan_fixed inherits it too --
-    no change needed in gz.launch.py.
+    republishes with the same reliability/durability. qos_overrides below
+    forces this node's /scan publisher to Best Effort at the source, so
+    scan_frame_fixer's auto-discovery picks that up and /scan_fixed
+    inherits it too -- no change needed in gz.launch.py.
 
     Height slice: min_height/max_height select points close to the
     lidar's own scan plane (laser_frame z ~ 0), i.e. the bottom-most
@@ -80,7 +81,7 @@ def generate_launch_description():
             'max_height': 0.05,
             'angle_min': -1.308997,   # -75 deg
             'angle_max': 1.308997,    # +75 deg (150 deg total, matches lidar.xacro)
-            'angle_increment': 0.0037997010159651666,  # 150 deg / 690 samples, full precision
+            'angle_increment': 0.0037941942028985507,  # 150 deg / 690 (bin-count formula, see docstring)
             'scan_time': 0.1,         # matches gpu_lidar update_rate (10 Hz)
             'range_min': 0.3,
             'range_max': 12.0,
