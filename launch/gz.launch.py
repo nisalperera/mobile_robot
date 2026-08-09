@@ -52,6 +52,7 @@ that topic loses the race, topic_tools/transform exits, and the '_fixed'
 topic never publishes for the rest of the session (e.g. right camera
 showing nothing in RViz, or the IMU fixer dying at startup).
 
+
 All four fixer nodes now set respawn=True with a short respawn_delay,
 so a fixer that loses the race on its first attempt is automatically
 restarted a second later, by which point the input topic is reliably
@@ -66,8 +67,30 @@ The 'ign gazebo' process now sets NVIDIA PRIME render offload env vars
 (__NV_PRIME_RENDER_OFFLOAD=1, __GLX_VENDOR_LIBRARY_NAME=nvidia) so
 rendering is forced onto the NVIDIA GPU automatically, without the user
 needing to export these in their shell every session. See:
-https://gazebosim.org/docs/latest/troubleshooting/ (Hybrid Intel/Nvidia
+[https://gazebosim.org/docs/latest/troubleshooting/](https://gazebosim.org/docs/latest/troubleshooting/) (Hybrid Intel/Nvidia
 systems).
+
+
+BUGFIX (feature/3d-lidar): the gpu_lidar sensor in lidar.xacro was made
+3D (16 vertical rings, 172 deg horiz x 60 deg vert) and its Ignition
+topic renamed 'scan' -> 'scan_2d', because Ignition's native LaserScan
+serialization cannot represent more than one vertical ring. The bridge
+below now bridges /scan_2d and /scan_2d/points (raw Ignition names).
+pointcloud_to_laserscan.launch.py subscribes to the bridged /scan_2d/points
+(valid 3D PointCloud2) and republishes a proper flattened single-ring
+LaserScan directly on ROS /scan -- the exact topic scan_frame_fixer
+below already expects as input, so scan_frame_fixer itself needed no
+topic change, only a QoS fix (see next note).
+
+
+BUGFIX (feature/3d-lidar, cont.): scan_frame_fixer's output topic
+/scan_fixed had no explicit QoS override, defaulting to Reliable.
+Both RViz's LaserScan/PointCloud displays and SLAM Toolbox's scan
+subscriber use SensorDataQoS (Best Effort) by convention, so neither
+could ever connect to /scan_fixed -- this is very likely why SLAM
+Toolbox never received scan data at all, independent of the 3D lidar
+change. scan_frame_fixer now passes --qos-profile sensor_data so its
+publisher matches what downstream sensor consumers actually request.
 
 
 World selection:
@@ -97,7 +120,6 @@ from launch_ros.actions import Node
 logger = logging.getLogger('launch')
 
 
-
 def log_args(context, *args, **kwargs):
     logger.info(
         f"[gz.launch.py] "
@@ -106,7 +128,6 @@ def log_args(context, *args, **kwargs):
         f"headless={LaunchConfiguration('headless').perform(context)} "
         f"world={LaunchConfiguration('world').perform(context)}"
     )
-
 
 
 def _resolve_world_path(context):
@@ -151,7 +172,6 @@ def _resolve_world_path(context):
     return world_file
 
 
-
 def launch_gazebo(context, *args, **kwargs):
     world_file = _resolve_world_path(context)
     headless = LaunchConfiguration('headless').perform(context).lower() == 'true'
@@ -192,7 +212,6 @@ def launch_gazebo(context, *args, **kwargs):
     return [gazebo]
 
 
-
 def generate_launch_description():
     package_name = 'mobile_robot'
 
@@ -223,8 +242,8 @@ def generate_launch_description():
             '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
             '/model/mobile_robot/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist',
             '/model/mobile_robot/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
-            '/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
-            '/scan/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+            '/scan_2d@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
+            '/scan_2d/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
             '/left_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
             '/right_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
@@ -262,7 +281,13 @@ def generate_launch_description():
     FIXER_RESPAWN_DELAY = 1.0
 
 
-    # --- Lidar ---------------------------------------------------------------
+    # --- Lidar -----------------------------------------------------------
+    # Input '/scan' is now populated by pointcloud_to_laserscan.launch.py
+    # (flattened from the 3D gpu_lidar's /scan_2d/points), not directly
+    # from the Ignition bridge. --qos-profile sensor_data makes the
+    # /scan_fixed output compatible with RViz's and SLAM Toolbox's
+    # SensorDataQoS (Best Effort) scan subscribers -- see BUGFIX note
+    # in the module docstring.
     scan_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -285,6 +310,7 @@ def generate_launch_description():
             "ranges=m.ranges, "
             "intensities=m.intensities)",
             '--import', 'sensor_msgs', 'std_msgs',
+            '--qos-profile', 'sensor_data',
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
