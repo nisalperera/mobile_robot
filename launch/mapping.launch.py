@@ -8,7 +8,7 @@ AMCL and Nav2 are NOT started — use localization_nav.launch.py for those.
 Odometry pipeline
 -----------------
   diff_drive_controller --> /odom/raw
-  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu/data
+  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu_fixed/data
   robot_localization EKF --> /odom  (fused, IMU-stabilised)
   EKF also publishes the odom -> base_footprint TF (publish_odom_tf: false
   in controllers.yaml so only ONE node writes this transform).
@@ -62,13 +62,12 @@ def generate_launch_description():
     pkg_share = get_package_share_directory(package_name)
 
 
-    # ── Launch arguments ───────────────────────────────────────────────────
+    # ── Launch arguments ────────────────────────────────────────────────
     sim_mode = LaunchConfiguration('sim_mode')
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
     headless = LaunchConfiguration('headless')
     world = LaunchConfiguration('world')
-    rviz_config = LaunchConfiguration('rviz_config')
 
 
     # ── Robot State Publisher (always runs — sim AND real robot) ───────────
@@ -151,9 +150,9 @@ def generate_launch_description():
 
 
     # ── IMU complementary filter (real robot only) ──────────────────────
-    # In sim mode the Ignition IMU bridge publishes on /imu.
+    # In sim mode the Ignition IMU bridge publishes on /imu_fixed.
     # The EKF config expects /imu/data in both modes, so in sim mode
-    # we remap /imu -> /imu/data on the EKF node (see below).
+    # we remap /imu_fixed -> /imu/data on the EKF node (see below).
     imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter.yaml')
     imu_filter = Node(
         package='imu_complementary_filter',
@@ -264,21 +263,6 @@ def generate_launch_description():
     )
 
 
-    # ── PointCloud → LaserScan (3D LIDAR support) ───────────────────────
-    # Flattens the gpu_lidar's 3D /scan/points into a proper single-ring
-    # 2D LaserScan on /scan_2d. scan_frame_fixer (in gz.launch.py) should
-    # consume /scan_2d instead of the raw Ignition /scan, since Ignition's
-    # gpu_lidar -> LaserScan bridge cannot correctly represent a lidar with
-    # >1 vertical sample (see description/xacro/lidar.xacro). SLAM Toolbox's
-    # scan_topic (/scan_fixed, downstream of scan_frame_fixer) then receives
-    # a valid 2D scan again.
-    pointcloud_to_laserscan = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_share, 'launch', 'pointcloud_to_laserscan.launch.py')
-        ),
-    )
-
-
     # ── SLAM Toolbox (online async — mapping mode) ─────────────────────
     slam_params_file = os.path.join(pkg_share, 'config', 'mapper_params_online_async.yaml')
     slam = IncludeLaunchDescription(
@@ -297,10 +281,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', 'rviz.launch.py')
         ),
-        launch_arguments={
-            'use_sim_time': use_sim_time,
-            'rviz_config': rviz_config
-        }.items(),
+        launch_arguments={'use_sim_time': use_sim_time}.items(),
         condition=UnlessCondition(headless),
     )
 
@@ -335,11 +316,6 @@ def generate_launch_description():
                 'absolute path. e.g. world:=house_world'
             ),
         ),
-        DeclareLaunchArgument(
-            'rviz_config',
-            default_value='default',
-            description='RViz config name (without .rviz) from the rviz/ directory'
-        ),
         LogInfo(msg=(
             '[mapping.launch.py] Mode: MAPPING — SLAM Toolbox active, '
             'EKF fusing /odom/raw + /imu/data -> /odom, AMCL/Nav2 NOT started.'
@@ -359,7 +335,6 @@ def generate_launch_description():
         # ── Common nodes ────────────────────────────────────────────
         joystick,
         twist_mux,
-        pointcloud_to_laserscan,
         slam,
         rviz,
     ])

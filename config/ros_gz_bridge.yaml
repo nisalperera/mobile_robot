@@ -15,12 +15,12 @@
 #   <topic>scan_2d</topic> in lidar.xacro causes Ignition to publish on
 #   the global topics /scan_2d and /scan_2d/points (confirmed via:
 #   ign topic -l | grep scan). The sensor topic was renamed from 'scan'
-#   because it now has 16 vertical rings, and Ignition's native
-#   LaserScan serialization can only represent a single ring -- so
-#   /scan_2d (LaserScan) is a degenerate dump not used by any consumer.
-#   /scan_2d/points (PointCloud2) carries the real 3D data and is
-#   consumed by launch/pointcloud_to_laserscan.launch.py, which
-#   republishes a flattened, valid single-ring scan on ROS /scan.
+#   because it now has 32 vertical rings (150 deg horiz x 60 deg vert),
+#   and Ignition's native LaserScan serialization can only represent a
+#   single ring -- so /scan_2d (LaserScan) is a degenerate dump not used
+#   by any consumer. /scan_2d/points (PointCloud2) carries the real 3D
+#   data and is consumed by launch/pointcloud_to_laserscan.launch.py,
+#   which republishes a flattened, valid single-ring scan on ROS /scan.
 #   scan_frame_fixer (gz.launch.py) then rewrites that /scan to
 #   /scan_fixed for SLAM Toolbox / Nav2, unchanged from before this
 #   sensor became 3D.
@@ -95,6 +95,7 @@
   ros_type_name: "sensor_msgs/msg/CameraInfo"
   gz_type_name: "ignition.msgs.CameraInfo"
   direction: GZ_TO_ROS
+
 
 - ros_topic_name: "imu_fixed"
   gz_topic_name: "imu_fixed"
