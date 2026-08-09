@@ -96,7 +96,6 @@
   gz_type_name: "ignition.msgs.CameraInfo"
   direction: GZ_TO_ROS
 
-
 - ros_topic_name: "imu_fixed"
   gz_topic_name: "imu_fixed"
   ros_type_name: "sensor_msgs/msg/Imu"       # was sensor_msgs/msg/imu_fixed

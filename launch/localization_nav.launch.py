@@ -9,8 +9,8 @@ A pre-built map MUST exist at the path given by the 'map' argument.
 Odometry pipeline
 ------------------
   diff_drive_controller --> /odom/raw
-  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu_fixed/data
-  robot_localization EKF --> /odom  (fused, IMU-stabilised)
+  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu/data
+  robot_localization EKF --> /odom/filtered  (fused, IMU-stabilised)
   EKF also publishes the odom -> base_footprint TF (publish_odom_tf: false
   in controllers.yaml so only ONE node writes this transform).
 
@@ -134,7 +134,7 @@ def generate_launch_description():
 
     # Remap /diff_drive_controller/odom -> /odom/raw so the EKF can
     # subscribe to the raw wheel encoder odometry on a separate topic
-    # from the fused /odom output that AMCL and Nav2 consume.
+    # from the fused /odom/filtered output that AMCL and Nav2 consume.
     diff_drive_spawner = Node(
         package='controller_manager',
         executable='spawner',
@@ -159,9 +159,9 @@ def generate_launch_description():
 
 
     # ── IMU complementary filter (real robot only) ───────────────────────
-    # In sim mode the Ignition IMU bridge publishes on /imu_fixed.
-    # The EKF config expects /imu_fixed/data in both modes, so in sim mode
-    # we remap /imu_fixed -> /imu_fixed/data on the EKF node (see below).
+    # In sim mode the Ignition IMU bridge publishes on /imu.
+    # The EKF config expects /imu/data in both modes, so in sim mode
+    # we remap /imu -> /imu/data on the EKF node (see below).
     imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter.yaml')
     imu_filter = Node(
         package='imu_complementary_filter',
@@ -171,23 +171,23 @@ def generate_launch_description():
         condition=UnlessCondition(sim_mode),
         parameters=[imu_filter_params, {'use_sim_time': use_sim_time}],
         remappings=[
-            ('/imu_fixed/data_raw', '/imu_fixed/data_raw'),
-            ('/imu_fixed/data',     '/imu_fixed/data'),
+            ('/imu/data_raw', '/imu/data_raw'),
+            ('/imu/data',     '/imu/data'),
         ],
     )
 
 
     # ── EKF (Extended Kalman Filter) ──────────────────────────────────────
-    # Fuses /odom/raw (wheel encoders) + /imu_fixed/data (angular velocity)
-    # and publishes the smoothed estimate on /odom + odom->base_footprint TF.
+    # Fuses /odom/raw (wheel encoders) + /imu/data (angular velocity)
+    # and publishes the smoothed estimate on /odom/filtered + odom->base_footprint TF.
     # AMCL then only has to correct map->odom, not odom->base_footprint,
-    # and Nav2's controllers/planners consume the IMU-stabilised /odom.
+    # and Nav2's controllers/planners consume the IMU-stabilised /odom/filtered.
     #
-    # In sim mode:  Ignition publishes the IMU on /imu_fixed (no /imu_fixed/data).
-    #               We remap /imu_fixed -> /imu_fixed/data here so ekf.yaml is
+    # In sim mode:  Ignition publishes the IMU on /imu (no /imu/data).
+    #               We remap /imu -> /imu/data here so ekf.yaml is
     #               identical in both sim and real-robot modes.
     #
-    # In real mode: imu_complementary_filter already publishes /imu_fixed/data
+    # In real mode: imu_complementary_filter already publishes /imu/data
     #               so no remapping is needed.
     ekf_params_file = os.path.join(pkg_share, 'config', 'ekf.yaml')
 
@@ -202,10 +202,10 @@ def generate_launch_description():
         remappings=[
             # Gazebo bridge publishes raw wheel odom on /odom
             ('/odom/raw', '/odom'),
-            # Ignition IMU bridge publishes on /imu_fixed, not /imu_fixed/data
-            ('/imu_fixed/data', '/imu_fixed'),
-            # EKF fused output -> /odom (consumed by AMCL + Nav2)
-            ('odometry/filtered', '/odom'),
+            # Ignition IMU bridge publishes on /imu, not /imu/data
+            ('/imu/data', '/imu'),
+            # EKF fused output -> /odom/filtered (consumed by AMCL + Nav2)
+            ('odometry/filtered', '/odom/filtered'),
         ],
     )
 
@@ -220,10 +220,10 @@ def generate_launch_description():
         remappings=[
             # diff_drive_spawner remaps /diff_drive_controller/odom -> /odom/raw
             ('/odom/raw', '/odom/raw'),
-            # imu_complementary_filter publishes on /imu_fixed/data
-            ('/imu_fixed/data', '/imu_fixed/data'),
-            # EKF fused output -> /odom
-            ('odometry/filtered', '/odom'),
+            # imu_complementary_filter publishes on /imu/data
+            ('/imu/data', '/imu/data'),
+            # EKF fused output -> /odom/filtered
+            ('odometry/filtered', '/odom/filtered'),
         ],
     )
 
@@ -332,7 +332,7 @@ def generate_launch_description():
         ),
         LogInfo(msg=(
             '[localization_nav.launch.py] Mode: LOCALIZATION+NAV — AMCL + Nav2 active, '
-            'EKF fusing /odom/raw + /imu_fixed/data -> /odom, SLAM NOT started.'
+            'EKF fusing /odom/raw + /imu/data -> /odom/filtered, SLAM NOT started.'
         )),
         # ── RSP (all modes) ──────────────────────────────────────────────
         robot_state_publisher,
