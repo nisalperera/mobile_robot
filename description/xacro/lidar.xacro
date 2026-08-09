@@ -50,10 +50,10 @@
         vertical rings, so Ignition's native LaserScan serialization
         on this topic is degenerate/unusable (LaserScan can only carry
         one ring). Ignition publishes:
-          - /scan_2d         (ignition.msgs.LaserScan, degenerate 3D dump
-                               -- NOT used directly by any consumer)
-          - /scan_2d/points  (ignition.msgs.PointCloudPacked, the real
-                               3D data -- bridged to ROS as PointCloud2)
+          - /scan_2d         (ignition.msgs.LaserScan; degenerate 3D dump,
+                               not used directly by any consumer)
+          - /scan_2d/points  (ignition.msgs.PointCloudPacked; the real
+                               3D data, bridged to ROS as PointCloud2)
         pointcloud_to_laserscan.launch.py consumes /scan_2d/points and
         republishes a proper single-ring 2D LaserScan on ROS topic
         /scan, which scan_frame_fixer (in gz.launch.py) then rewrites
