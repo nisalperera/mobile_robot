@@ -1,6 +1,8 @@
 """gz.launch.py
 
+
 Ignition Gazebo simulation launcher.
+
 
 Ignition Fortress sensor frame_id namespacing issue:
   All sensors get header.frame_id set to their fully-namespaced internal
@@ -8,23 +10,65 @@ Ignition Fortress sensor frame_id namespacing issue:
     lidar   -> 'mobile_robot/base_footprint/laser'
     cameras -> 'mobile_robot/base_footprint/left_camera'
                'mobile_robot/base_footprint/right_camera'
+    imu     -> 'mobile_robot/base_footprint/imu_link'
+
 
   The ROS TF tree only knows the URDF link names:
-    'laser_frame', 'left_camera_link_optical', 'right_camera_link_optical'
+    'laser_frame', 'left_camera_link_optical', 'right_camera_link_optical',
+    'imu_link'
+
 
   RViz and SLAM Toolbox drop every message because the frame_id never
   resolves in TF.
+
 
 Fix: topic_tools transform nodes rewrite frame_id on each sensor topic
 before any ROS node sees it:
   /scan               -> /scan_fixed               (frame_id: laser_frame)
   /left_camera/image  -> /left_camera/image_fixed  (frame_id: left_camera_link_optical)
   /right_camera/image -> /right_camera/image_fixed (frame_id: right_camera_link_optical)
+  /imu                -> /imu_fixed                (frame_id: imu_link)
 
-The camera frame fixers are delayed by 3 s (TimerAction) so that
-ros_gz_bridge has time to connect to Ignition and begin publishing
-before topic_tools tries to subscribe. Without the delay the transform
-nodes exit immediately with 'wrong input topic'.
+
+All four fixers are delayed by 8 s (TimerAction) so that:
+  1. ros_gz_bridge has connected to Ignition and is publishing
+  2. The robot has been spawned by ros_gz_sim create
+  3. Controller spawners have fired (also at 5 s)
+before any topic_tools/transform node tries to subscribe.
+
+
+Without a delay, topic_tools exits immediately with 'no publisher'
+if the input topic is not yet live, and /scan_fixed / /imu_fixed
+never publish for the lifetime of the session.
+
+
+BUGFIX (map-rotation-fix): a fixed delay alone is not fully reliable.
+On machines where Ignition falls back to software rendering (no working
+GPU acceleration -- e.g. 'amdgpu_device_initialize failed' / 'libGL
+error: failed to load driver'), camera sensor plugins can take longer
+than the delay to publish their first frame, and ros2_control init can
+also run close to the delay boundary. When that happens the fixer for
+that topic loses the race, topic_tools/transform exits, and the '_fixed'
+topic never publishes for the rest of the session (e.g. right camera
+showing nothing in RViz, or the IMU fixer dying at startup).
+
+All four fixer nodes now set respawn=True with a short respawn_delay,
+so a fixer that loses the race on its first attempt is automatically
+restarted a second later, by which point the input topic is reliably
+publishing.
+
+
+BUGFIX (map-rotation-fix, cont.): the root cause of the slow/unreliable
+rendering on hybrid-GPU laptops (AMD iGPU + NVIDIA dGPU) is that
+Ignition defaults to the AMD driver stack, which can fail to initialize
+hardware acceleration entirely and fall back to software rendering.
+The 'ign gazebo' process now sets NVIDIA PRIME render offload env vars
+(__NV_PRIME_RENDER_OFFLOAD=1, __GLX_VENDOR_LIBRARY_NAME=nvidia) so
+rendering is forced onto the NVIDIA GPU automatically, without the user
+needing to export these in their shell every session. See:
+https://gazebosim.org/docs/latest/troubleshooting/ (Hybrid Intel/Nvidia
+systems).
+
 
 World selection:
   Pass world:=<name>  to load a different world at runtime.
@@ -33,8 +77,10 @@ World selection:
     world:=/abs/path/to.world  (absolute path for external worlds)
 """
 
+
 import logging
 import os
+
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -47,21 +93,25 @@ from launch.actions import (
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+
 logger = logging.getLogger('launch')
+
 
 
 def log_args(context, *args, **kwargs):
     logger.info(
         f"[gz.launch.py] "
         f"use_sim_time={LaunchConfiguration('use_sim_time').perform(context)} "
-        f"use_ros2_control={LaunchConfiguration('use_ros2_control').perform(context)} "
+        # f"use_ros2_control={LaunchConfiguration('use_ros2_control').perform(context)} "
         f"headless={LaunchConfiguration('headless').perform(context)} "
         f"world={LaunchConfiguration('world').perform(context)}"
     )
 
 
+
 def _resolve_world_path(context):
     """Resolve the 'world' launch arg to an absolute .world file path.
+
 
     Accepts two forms:
       1. A plain name (no path separators, no extension), e.g. 'house_world'
@@ -69,20 +119,20 @@ def _resolve_world_path(context):
       2. An absolute path, e.g. '/tmp/my_arena.world'
          -> used as-is
 
+
     Raises FileNotFoundError if the resolved path does not exist so the
     error is clear rather than Ignition silently loading an empty world.
     """
     world_arg = LaunchConfiguration('world').perform(context)
 
+
     if os.path.isabs(world_arg):
-        # Absolute path provided directly
         world_file = world_arg
     else:
-        # Treat as a world name inside the package worlds/ directory
         pkg_share = get_package_share_directory('mobile_robot')
-        # Accept both 'house_world' and 'house_world.world'
         name = world_arg if world_arg.endswith('.world') else f'{world_arg}.world'
         world_file = os.path.join(pkg_share, 'worlds', name)
+
 
     if not os.path.isfile(world_file):
         raise FileNotFoundError(
@@ -96,8 +146,10 @@ def _resolve_world_path(context):
             )
         )
 
+
     logger.info(f'[gz.launch.py] Loading world: {world_file}')
     return world_file
+
 
 
 def launch_gazebo(context, *args, **kwargs):
@@ -106,8 +158,10 @@ def launch_gazebo(context, *args, **kwargs):
     gz_args = f'-r -s --force-version 6 {world_file}' if headless \
                  else f'-r --force-version 6 {world_file}'
 
+
     existing_plugin_path = os.environ.get('IGN_GAZEBO_SYSTEM_PLUGIN_PATH', '')
     existing_resource_path = os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')
+
 
     plugin_paths = ':'.join(filter(None, [
         '/opt/ros/humble/lib',
@@ -119,22 +173,33 @@ def launch_gazebo(context, *args, **kwargs):
         existing_resource_path,
     ]))
 
+
     gazebo = ExecuteProcess(
         cmd=['ign', 'gazebo'] + gz_args.split(),
         output='screen',
         additional_env={
             'IGN_GAZEBO_SYSTEM_PLUGIN_PATH': plugin_paths,
             'IGN_GAZEBO_RESOURCE_PATH':      resource_paths,
+            # BUGFIX (map-rotation-fix): force rendering onto the NVIDIA
+            # discrete GPU via PRIME render offload. Without this,
+            # Ignition defaults to the AMD integrated GPU driver stack,
+            # which on this hardware fails to initialize hardware
+            # acceleration and falls back to slow software rendering.
+            '__NV_PRIME_RENDER_OFFLOAD': '1',
+            '__GLX_VENDOR_LIBRARY_NAME': 'nvidia',
         }
     )
     return [gazebo]
 
 
+
 def generate_launch_description():
     package_name = 'mobile_robot'
 
+
     use_sim_time = LaunchConfiguration('use_sim_time')
-    use_ros2_control = LaunchConfiguration('use_ros2_control')
+    # use_ros2_control = LaunchConfiguration('use_ros2_control')
+
 
     spawn_entity = Node(
         package='ros_gz_sim',
@@ -146,6 +211,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
     )
+
 
     # -------------------------------------------------------------------------
     # Topic bridge: Ignition <-> ROS2
@@ -163,36 +229,40 @@ def generate_launch_description():
             '/left_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
             '/right_camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/right_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            '/imu@sensor_msgs/msg/Imu[ignition.msgs.IMU',
         ],
         remappings=[
-            ('/model/mobile_robot/odometry', '/diff_drive_controller/odom'),
+            # ('/model/mobile_robot/odometry', '/diff_drive_controller/odom'),
             ('/model/mobile_robot/cmd_vel',  '/diff_drive_controller/cmd_vel_unstamped'),
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
+
     # =========================================================================
     # Frame-id fixers
     #
-    # Ignition Fortress sets header.frame_id to the fully-namespaced internal
-    # sensor path for every sensor. None of these exist in the ROS TF tree.
-    # Each fixer subscribes the raw bridged topic, rewrites frame_id to the
-    # correct URDF link name, and republishes on a _fixed topic.
+    # CRITICAL: topic_tools/transform exits (does not retry) if the input
+    # topic has no publisher when the node starts. A fixed startup delay
+    # alone is not fully reliable -- see BUGFIX note in the module
+    # docstring. Each fixer below also sets respawn=True so a fixer that
+    # loses the startup race is automatically restarted shortly after,
+    # once the input topic is reliably publishing.
     #
-    # Downstream consumers (RViz, SLAM Toolbox, perception nodes) must
-    # subscribe the _fixed topics, NOT the raw bridge topics.
+    # FIXER_DELAY covers the typical case:
+    #   ~2 s  Ignition world load + robot spawn
+    #   ~1 s  ros_gz_bridge connects to Ignition topics
+    #   ~2 s  controller spawners activate (also fired at 5 s)
+    #   +3 s  extra margin for slow/software-rendering machines
     #
-    # The lidar fixer starts immediately — /scan is available as soon as
-    # the bridge connects.
-    #
-    # The camera fixers are delayed by 3 s so ros_gz_bridge has time to
-    # connect to Ignition and start publishing before topic_tools tries
-    # to subscribe. Without the delay topic_tools exits with:
-    #   "wrong input topic" / no publisher found.
+    # If your machine is slow, increase this value further.
     # =========================================================================
+    FIXER_DELAY = 8.0
+    FIXER_RESPAWN_DELAY = 1.0
 
-    # --- Lidar (no delay needed) ---------------------------------------------
+
+    # --- Lidar ---------------------------------------------------------------
     scan_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -218,9 +288,12 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+        respawn=True,
+        respawn_delay=FIXER_RESPAWN_DELAY,
     )
 
-    # --- Left camera (delayed 3 s) -------------------------------------------
+
+    # --- Left camera ---------------------------------------------------------
     left_camera_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -243,9 +316,12 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+        respawn=True,
+        respawn_delay=FIXER_RESPAWN_DELAY,
     )
 
-    # --- Right camera (delayed 3 s) ------------------------------------------
+
+    # --- Right camera --------------------------------------------------------
     right_camera_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -268,15 +344,55 @@ def generate_launch_description():
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+        respawn=True,
+        respawn_delay=FIXER_RESPAWN_DELAY,
     )
 
-    # Camera fixers share a single 3-second delay so they start together
-    # after the bridge is ready.
-    delayed_camera_fixers = TimerAction(
-        period=3.0,
-        actions=[left_camera_frame_fixer, right_camera_frame_fixer],
+
+    # --- IMU -----------------------------------------------------------------
+    imu_frame_fixer = Node(
+        package='topic_tools',
+        executable='transform',
+        name='imu_frame_fixer',
+        arguments=[
+            '/imu',
+            '/imu_fixed',
+            'sensor_msgs/msg/Imu',
+            # Ignition IMU plugin omits covariance output; hardcode variances
+            # from description/xacro/imu.xacro noise stddev values.
+            "sensor_msgs.msg.Imu("
+            "header=std_msgs.msg.Header("
+            "stamp=m.header.stamp, "
+            "frame_id='imu_link'), "
+            "orientation=m.orientation, "
+            "orientation_covariance=[-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "
+            "angular_velocity=m.angular_velocity, "
+            "angular_velocity_covariance=[2.5e-5, 0.0, 0.0, 0.0, 2.5e-5, 0.0, 0.0, 0.0, 2.5e-5], "
+            "linear_acceleration=m.linear_acceleration, "
+            "linear_acceleration_covariance=[1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4])",
+            '--import', 'sensor_msgs', 'std_msgs',
+        ],
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        respawn=True,
+        respawn_delay=FIXER_RESPAWN_DELAY,
     )
 
+
+    # All fixers share a single TimerAction
+    delayed_sensor_fixers = TimerAction(
+        period=FIXER_DELAY,
+        actions=[
+            scan_frame_fixer,
+            left_camera_frame_fixer,
+            right_camera_frame_fixer,
+            imu_frame_fixer,
+        ],
+    )
+
+
+    # -------------------------------------------------------------------------
+    # Controller spawners — also at 5 s (robot must be spawned first)
     # -------------------------------------------------------------------------
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
@@ -295,15 +411,16 @@ def generate_launch_description():
         actions=[joint_state_broadcaster_spawner, diff_drive_controller_spawner],
     )
 
+
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='true',
             description='Use simulation clock if true'),
-        DeclareLaunchArgument(
-            'use_ros2_control',
-            default_value='true',
-            description='Use ros2_control if true'),
+        # DeclareLaunchArgument(
+        #     'use_ros2_control',
+        #     default_value='true',
+        #     description='Use ros2_control if true'),
         DeclareLaunchArgument(
             'use_slam',
             default_value='false',
@@ -314,20 +431,19 @@ def generate_launch_description():
             description='Run Gazebo without GUI if true'),
         DeclareLaunchArgument(
             'world',
-            default_value='ignition_world',
+            default_value='ignition_empty_world',
             description=(
                 'World to load. Accepts either:\n'
                 '  - A world name (file stem) from the worlds/ directory,\n'
                 '    e.g. world:=ignition_world  or  world:=house_world\n'
                 '  - An absolute path to a .world file,\n'
-                '    e.g. world:=/tmp/my_arena.world'
+                '    e.g. world:=/abs/path/to.world'
             )
         ),
         OpaqueFunction(function=log_args),
         OpaqueFunction(function=launch_gazebo),
         spawn_entity,
         bridge,
-        scan_frame_fixer,
-        delayed_camera_fixers,
+        delayed_sensor_fixers,
         delayed_spawners,
     ])
