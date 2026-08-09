@@ -18,10 +18,10 @@ sim_mode        : true (default) | false
 use_sim_time    : true (default) | false
 use_ros2_control: true (default) | false
 map             : path to map YAML file
-                  (default: <package>/maps/map_save.yaml)
+                  (default: <package>/maps/house_world_map.yaml)
 headless        : true (default) | false
     true  → does not launch RViz.
-world           : world name or absolute path (default: ignition_world)
+world           : world name or absolute path (default: ignition_empty_world)
     Name is resolved to <pkg_share>/worlds/<name>.world automatically.
     e.g. world:=house_world  or  world:=/tmp/my_arena.world
 
@@ -67,7 +67,7 @@ def generate_launch_description():
     headless = LaunchConfiguration('headless')
     world = LaunchConfiguration('world')
 
-    # ── Robot State Publisher (always runs — sim AND real robot) ────────
+    # ── Robot State Publisher (always runs — sim AND real robot) ─────────────
     xacro_file = os.path.join(pkg_share, 'description', 'robot.urdf.xacro')
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -272,7 +272,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'map',
-            default_value=os.path.join(pkg_share, 'maps', 'map_save.yaml'),
+            default_value=os.path.join(pkg_share, 'maps', 'house_world_map.yaml'),
             description='Full path to the pre-built map YAML file',
         ),
         DeclareLaunchArgument(
