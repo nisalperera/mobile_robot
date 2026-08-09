@@ -1,8 +1,10 @@
 """localization_nav.launch.py
 
+
 Launches the robot in LOCALIZATION + NAVIGATION mode using AMCL + Nav2.
 SLAM Toolbox is NOT started — use mapping.launch.py for mapping.
 A pre-built map MUST exist at the path given by the 'map' argument.
+
 
 Odometry pipeline
 ------------------
@@ -11,6 +13,7 @@ Odometry pipeline
   robot_localization EKF --> /odom  (fused, IMU-stabilised)
   EKF also publishes the odom -> base_footprint TF (publish_odom_tf: false
   in controllers.yaml so only ONE node writes this transform).
+
 
 Launch arguments
 ----------------
@@ -25,14 +28,17 @@ world           : world name or absolute path (default: ignition_world)
     Name is resolved to <pkg_share>/worlds/<name>.world automatically.
     e.g. world:=house_world  or  world:=/tmp/my_arena.world
 
+
 Example (Laptop — simulation)
 -----------------------------
     ros2 launch mobile_robot localization_nav.launch.py
     ros2 launch mobile_robot localization_nav.launch.py world:=house_world
 
+
     # With a custom map:
     ros2 launch mobile_robot localization_nav.launch.py \\
         world:=house_world map:=/path/to/house_map.yaml
+
 
 Example (Jetson — real robot)
 ------------------------------
@@ -41,9 +47,12 @@ Example (Jetson — real robot)
         map:=/home/jetson/maps/my_map.yaml
 """
 
+
 import os
 
+
 from ament_index_python.packages import get_package_share_directory
+
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
@@ -56,8 +65,10 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
 
+
     package_name = 'mobile_robot'
     pkg_share = get_package_share_directory(package_name)
+
 
     # ── Launch arguments ────────────────────────────────────────────────
     sim_mode = LaunchConfiguration('sim_mode')
@@ -66,6 +77,7 @@ def generate_launch_description():
     map_yaml = LaunchConfiguration('map')
     headless = LaunchConfiguration('headless')
     world = LaunchConfiguration('world')
+
 
     # ── Robot State Publisher (always runs — sim AND real robot) ────────
     xacro_file = os.path.join(pkg_share, 'description', 'robot.urdf.xacro')
@@ -86,6 +98,7 @@ def generate_launch_description():
         }],
     )
 
+
     # ── Gazebo (sim mode only) ───────────────────────────────────────────
     gazebo_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -100,8 +113,10 @@ def generate_launch_description():
         condition=IfCondition(sim_mode),
     )
 
+
     # ── ros2_control + spawners (real-robot only) ────────────────────────
     controller_params_file = os.path.join(pkg_share, 'config', 'controllers.yaml')
+
 
     control_node = Node(
         package='controller_manager',
@@ -115,6 +130,7 @@ def generate_launch_description():
         output='both',
         respawn=True,
     )
+
 
     # Remap /diff_drive_controller/odom -> /odom/raw so the EKF can
     # subscribe to the raw wheel encoder odometry on a separate topic
@@ -131,6 +147,7 @@ def generate_launch_description():
         ],
     )
 
+
     joint_broad_spawner = Node(
         package='controller_manager',
         executable='spawner',
@@ -139,6 +156,7 @@ def generate_launch_description():
         arguments=['joint_state_broadcaster'],
         parameters=[{'use_sim_time': use_sim_time}],
     )
+
 
     # ── IMU complementary filter (real robot only) ───────────────────────
     # In sim mode the Ignition IMU bridge publishes on /imu_fixed.
@@ -158,6 +176,7 @@ def generate_launch_description():
         ],
     )
 
+
     # ── EKF (Extended Kalman Filter) ──────────────────────────────────────
     # Fuses /odom/raw (wheel encoders) + /imu_fixed/data (angular velocity)
     # and publishes the smoothed estimate on /odom + odom->base_footprint TF.
@@ -171,6 +190,7 @@ def generate_launch_description():
     # In real mode: imu_complementary_filter already publishes /imu_fixed/data
     #               so no remapping is needed.
     ekf_params_file = os.path.join(pkg_share, 'config', 'ekf.yaml')
+
 
     ekf_node_sim = Node(
         package='robot_localization',
@@ -189,6 +209,7 @@ def generate_launch_description():
         ],
     )
 
+
     ekf_node_real = Node(
         package='robot_localization',
         executable='ekf_node',
@@ -206,6 +227,7 @@ def generate_launch_description():
         ],
     )
 
+
     # ── Joystick / teleop ─────────────────────────────────────────────────
     joystick = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -213,6 +235,7 @@ def generate_launch_description():
         ),
         launch_arguments={'use_sim_time': use_sim_time}.items(),
     )
+
 
     # ── Twist mux ───────────────────────────────────────────────────────
     twist_mux_params = os.path.join(pkg_share, 'config', 'twist_mux.yaml')
@@ -222,6 +245,22 @@ def generate_launch_description():
         parameters=[twist_mux_params, {'use_sim_time': use_sim_time}],
         remappings=[('/cmd_vel_out', '/diff_drive_controller/cmd_vel_unstamped')],
     )
+
+
+    # ── PointCloud → LaserScan (3D LIDAR support) ────────────────────────
+    # Flattens the gpu_lidar's 3D /scan/points into a proper single-ring
+    # 2D LaserScan on /scan_2d. scan_frame_fixer (in gz.launch.py) should
+    # consume /scan_2d instead of the raw Ignition /scan, since Ignition's
+    # gpu_lidar -> LaserScan bridge cannot correctly represent a lidar with
+    # >1 vertical sample (see description/xacro/lidar.xacro). AMCL and
+    # Nav2's costmap layers (via /scan_fixed, downstream of scan_frame_fixer)
+    # then receive a valid 2D scan again.
+    pointcloud_to_laserscan = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_share, 'launch', 'pointcloud_to_laserscan.launch.py')
+        ),
+    )
+
 
     # ── AMCL (localization) ────────────────────────────────────────────────
     amcl_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
@@ -236,6 +275,7 @@ def generate_launch_description():
         }.items(),
     )
 
+
     # ── Nav2 stack ─────────────────────────────────────────────────────────
     navigation = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -243,6 +283,7 @@ def generate_launch_description():
         ),
         launch_arguments={'use_sim_time': use_sim_time}.items(),
     )
+
 
     # ── RViz (optional, skip if headless) ───────────────────────────────────
     rviz = IncludeLaunchDescription(
@@ -252,6 +293,7 @@ def generate_launch_description():
         launch_arguments={'use_sim_time': use_sim_time}.items(),
         condition=UnlessCondition(headless),
     )
+
 
     return LaunchDescription([
         # ── Declare args ──────────────────────────────────────────────
@@ -307,6 +349,7 @@ def generate_launch_description():
         # ── Common nodes ──────────────────────────────────────────────────
         joystick,
         twist_mux,
+        pointcloud_to_laserscan,
         # ── Localization + Navigation ─────────────────────────────────────
         amcl,
         navigation,

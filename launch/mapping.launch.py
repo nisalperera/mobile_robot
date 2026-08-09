@@ -55,7 +55,6 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
-
 def generate_launch_description():
 
 
@@ -264,6 +263,21 @@ def generate_launch_description():
     )
 
 
+    # ── PointCloud → LaserScan (3D LIDAR support) ───────────────────────
+    # Flattens the gpu_lidar's 3D /scan/points into a proper single-ring
+    # 2D LaserScan on /scan_2d. scan_frame_fixer (in gz.launch.py) should
+    # consume /scan_2d instead of the raw Ignition /scan, since Ignition's
+    # gpu_lidar -> LaserScan bridge cannot correctly represent a lidar with
+    # >1 vertical sample (see description/xacro/lidar.xacro). SLAM Toolbox's
+    # scan_topic (/scan_fixed, downstream of scan_frame_fixer) then receives
+    # a valid 2D scan again.
+    pointcloud_to_laserscan = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_share, 'launch', 'pointcloud_to_laserscan.launch.py')
+        ),
+    )
+
+
     # ── SLAM Toolbox (online async — mapping mode) ─────────────────────
     slam_params_file = os.path.join(pkg_share, 'config', 'mapper_params_online_async.yaml')
     slam = IncludeLaunchDescription(
@@ -336,6 +350,7 @@ def generate_launch_description():
         # ── Common nodes ────────────────────────────────────────────
         joystick,
         twist_mux,
+        pointcloud_to_laserscan,
         slam,
         rviz,
     ])
