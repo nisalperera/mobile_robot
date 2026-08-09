@@ -68,6 +68,7 @@ def generate_launch_description():
     use_ros2_control = LaunchConfiguration('use_ros2_control')
     headless = LaunchConfiguration('headless')
     world = LaunchConfiguration('world')
+    rviz_config = LaunchConfiguration('rviz_config')
 
 
     # ── Robot State Publisher (always runs — sim AND real robot) ───────────
@@ -296,7 +297,10 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', 'rviz.launch.py')
         ),
-        launch_arguments={'use_sim_time': use_sim_time}.items(),
+        launch_arguments={
+            'use_sim_time': use_sim_time,
+            'rviz_config': rviz_config
+        }.items(),
         condition=UnlessCondition(headless),
     )
 
@@ -330,6 +334,11 @@ def generate_launch_description():
                 'World to load in Gazebo. Accepts a name from worlds/ or an '
                 'absolute path. e.g. world:=house_world'
             ),
+        ),
+        DeclareLaunchArgument(
+            'rviz_config',
+            default_value='default',
+            description='RViz config name (without .rviz) from the rviz/ directory'
         ),
         LogInfo(msg=(
             '[mapping.launch.py] Mode: MAPPING — SLAM Toolbox active, '
