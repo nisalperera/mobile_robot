@@ -19,9 +19,26 @@ def generate_launch_description():
     there. This node is effectively a drop-in replacement for Ignition's
     own /scan output.
 
-    Horizontal FOV/sample count (updated): 150 deg total (+/-75 deg),
-    690 samples (~0.218 deg/sample) -- matches lidar.xacro's horizontal
-    block.
+    Horizontal FOV/sample count: 150 deg total (+/-75 deg), 690 samples.
+    angle_increment now uses full float precision (not rounded to 6
+    decimals) so the node's internal computed reading count exactly
+    matches 690 -- a rounded increment previously produced 689 readings,
+    which SLAM Toolbox logged as
+    "LaserRangeScan contains 689 range readings, expected 690" on every
+    scan (harmless but noisy).
+
+    QoS (BUGFIX, feature/3d-lidar): topic_tools/transform (scan_frame_fixer
+    in gz.launch.py) does NOT accept an explicit output QoS override --
+    it auto-discovers the QoS of whatever it is subscribed to and
+    republishes with the same reliability/durability. Since this node's
+    /scan publisher previously had no explicit QoS (defaulting to
+    Reliable), scan_frame_fixer inherited Reliable for /scan_fixed too,
+    and neither RViz's LaserScan/PointCloud displays nor any other
+    Best-Effort ("sensor data") subscriber could ever connect to /scan
+    or /scan_fixed. qos_overrides below forces this node's /scan
+    publisher to Best Effort at the source, so scan_frame_fixer's
+    auto-discovery picks that up and /scan_fixed inherits it too --
+    no change needed in gz.launch.py.
 
     Height slice: min_height/max_height select points close to the
     lidar's own scan plane (laser_frame z ~ 0), i.e. the bottom-most
@@ -63,13 +80,25 @@ def generate_launch_description():
             'max_height': 0.05,
             'angle_min': -1.308997,   # -75 deg
             'angle_max': 1.308997,    # +75 deg (150 deg total, matches lidar.xacro)
-            'angle_increment': 0.003799701,  # 150 deg / 690 samples
+            'angle_increment': 0.0037997010159651666,  # 150 deg / 690 samples, full precision
             'scan_time': 0.1,         # matches gpu_lidar update_rate (10 Hz)
             'range_min': 0.3,
             'range_max': 12.0,
             'use_inf': True,
             'inf_epsilon': 1.0,
             'concurrency_level': 1,
+            # BUGFIX (feature/3d-lidar): force this node's /scan publisher
+            # to Best Effort so scan_frame_fixer's auto-discovered output
+            # QoS (and any other downstream sensor-data subscriber, e.g.
+            # RViz) can actually connect. See docstring above.
+            'qos_overrides': {
+                '/scan': {
+                    'publisher': {
+                        'reliability': 'best_effort',
+                        'durability': 'volatile',
+                    }
+                }
+            },
         }],
     )
 

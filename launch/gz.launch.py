@@ -72,7 +72,7 @@ systems).
 
 
 BUGFIX (feature/3d-lidar): the gpu_lidar sensor in lidar.xacro was made
-3D (16 vertical rings, 172 deg horiz x 60 deg vert) and its Ignition
+3D (32 vertical rings, 150 deg horiz x 60 deg vert) and its Ignition
 topic renamed 'scan' -> 'scan_2d', because Ignition's native LaserScan
 serialization cannot represent more than one vertical ring. The bridge
 below now bridges /scan_2d and /scan_2d/points (raw Ignition names).
@@ -84,13 +84,14 @@ topic change, only a QoS fix (see next note).
 
 
 BUGFIX (feature/3d-lidar, cont.): scan_frame_fixer's output topic
-/scan_fixed had no explicit QoS override, defaulting to Reliable.
-Both RViz's LaserScan/PointCloud displays and SLAM Toolbox's scan
-subscriber use SensorDataQoS (Best Effort) by convention, so neither
-could ever connect to /scan_fixed -- this is very likely why SLAM
-Toolbox never received scan data at all, independent of the 3D lidar
-change. scan_frame_fixer now passes --qos-profile sensor_data so its
-publisher matches what downstream sensor consumers actually request.
+/scan_fixed inherited whatever QoS reliability its input /scan had.
+topic_tools/transform does NOT accept an explicit output QoS override
+via CLI flag -- it auto-discovers the QoS of its input topic's
+publisher and republishes with the same reliability/durability. The
+actual fix lives in pointcloud_to_laserscan.launch.py, which now sets
+qos_overrides on its own /scan publisher to Best Effort; scan_frame_fixer
+picks that up automatically via auto-discovery and /scan_fixed inherits
+it too, with no change needed here.
 
 
 World selection:
@@ -284,10 +285,10 @@ def generate_launch_description():
     # --- Lidar -----------------------------------------------------------
     # Input '/scan' is now populated by pointcloud_to_laserscan.launch.py
     # (flattened from the 3D gpu_lidar's /scan_2d/points), not directly
-    # from the Ignition bridge. --qos-profile sensor_data makes the
-    # /scan_fixed output compatible with RViz's and SLAM Toolbox's
-    # SensorDataQoS (Best Effort) scan subscribers -- see BUGFIX note
-    # in the module docstring.
+    # from the Ignition bridge. Its QoS is auto-discovered from /scan's
+    # publisher (Best Effort, set via qos_overrides in
+    # pointcloud_to_laserscan.launch.py), so /scan_fixed inherits Best
+    # Effort automatically -- see BUGFIX note in the module docstring.
     scan_frame_fixer = Node(
         package='topic_tools',
         executable='transform',
@@ -310,7 +311,6 @@ def generate_launch_description():
             "ranges=m.ranges, "
             "intensities=m.intensities)",
             '--import', 'sensor_msgs', 'std_msgs',
-            '--qos-profile', 'sensor_data',
         ],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
