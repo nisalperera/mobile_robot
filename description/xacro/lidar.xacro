@@ -37,16 +37,22 @@
         this sensor; type="gpu_lidar" rasterizes all rays on the GPU
         instead of the CPU-based "lidar"/"ray" sensor types.
 
-        Coverage (per bugfix/map-rotation-fix -> feature/3d-lidar):
-          Horizontal: 172 deg total, centered on the robot's front
-            (+X of laser_frame), i.e. +/-86 deg = +/-1.500983 rad.
+        Coverage (per feature/3d-lidar, updated):
+          Horizontal: 150 deg total, centered on the robot's front
+            (+X of laser_frame), i.e. +/-75 deg = +/-1.308997 rad.
+            690 samples (~0.218 deg/sample), double the previous
+            345-sample density.
           Vertical:   60 deg total. Rays START at the LIDAR's own
             level (0 rad = the horizontal plane through the sensor,
             perpendicular to the sensor's vertical axis) and sweep
             UP to +60 deg (1.047198 rad). min_vertical_angle is 0,
             NOT -30/+30, so no rays point below the sensor's plane.
+            32 rings (~1.94 deg/ring), double the previous 16 rings.
+          Total rays/scan: 690 x 32 = 22,080 (4x the original 5,520);
+            watch GPU load on machines without working hardware
+            acceleration, see amdgpu fallback notes in gz.launch.py.
 
-        Topic renamed from 'scan' to 'scan_2d': this sensor has 16
+        Topic renamed from 'scan' to 'scan_2d': this sensor has multiple
         vertical rings, so Ignition's native LaserScan serialization
         on this topic is degenerate/unusable (LaserScan can only carry
         one ring). Ignition publishes:
@@ -73,13 +79,13 @@
             <lidar>
                 <scan>
                     <horizontal>
-                        <samples>345</samples>
+                        <samples>690</samples>
                         <resolution>1</resolution>
-                        <min_angle>-1.500983</min_angle>
-                        <max_angle>1.500983</max_angle>
+                        <min_angle>-1.308997</min_angle>
+                        <max_angle>1.308997</max_angle>
                     </horizontal>
                     <vertical>
-                        <samples>16</samples>
+                        <samples>32</samples>
                         <resolution>1</resolution>
                         <min_angle>0.0</min_angle>
                         <max_angle>1.047198</max_angle>

@@ -7,10 +7,10 @@ def generate_launch_description():
     sensor_msgs/LaserScan published directly on /scan, for consumption by
     2D-only pipelines (SLAM Toolbox's scan_topic via scan_frame_fixer's
     /scan_fixed, Nav2 2D costmap layers) that cannot correctly interpret
-    a 16-vertical-ring LaserScan.
+    a multi-vertical-ring LaserScan.
 
     Ignition's gpu_lidar sensor topic was renamed 'scan' -> 'scan_2d' in
-    description/xacro/lidar.xacro (this sensor now has 16 vertical rings,
+    description/xacro/lidar.xacro (this sensor now has 32 vertical rings,
     so Ignition's native LaserScan on that topic is degenerate/unusable --
     LaserScan can only carry one ring). The bridged PointCloud2 data lives
     on /scan_2d/points; this node subscribes to that and republishes a
@@ -19,10 +19,15 @@ def generate_launch_description():
     there. This node is effectively a drop-in replacement for Ignition's
     own /scan output.
 
+    Horizontal FOV/sample count (updated): 150 deg total (+/-75 deg),
+    690 samples (~0.218 deg/sample) -- matches lidar.xacro's horizontal
+    block.
+
     Height slice: min_height/max_height select points close to the
     lidar's own scan plane (laser_frame z ~ 0), i.e. the bottom-most
-    ring where vertical angle ~ 0 rad, matching the "rays start at the
-    LIDAR's own level" geometry configured in description/xacro/lidar.xacro.
+    ring(s) where vertical angle ~ 0 rad, matching the "rays start at
+    the LIDAR's own level" geometry configured in
+    description/xacro/lidar.xacro.
 
     ignition_laser_frame_bridge: Ignition's gpu_lidar publishes with
     frame_id 'mobile_robot/base_footprint/laser' -- an internal
@@ -56,9 +61,9 @@ def generate_launch_description():
             'transform_tolerance': 0.02,
             'min_height': -0.05,
             'max_height': 0.05,
-            'angle_min': -1.500983,   # -86 deg
-            'angle_max': 1.500983,    # +86 deg (172 deg total, matches lidar.xacro)
-            'angle_increment': 0.008726645,  # 172 deg / 345 samples
+            'angle_min': -1.308997,   # -75 deg
+            'angle_max': 1.308997,    # +75 deg (150 deg total, matches lidar.xacro)
+            'angle_increment': 0.003799701,  # 150 deg / 690 samples
             'scan_time': 0.1,         # matches gpu_lidar update_rate (10 Hz)
             'range_min': 0.3,
             'range_max': 12.0,
