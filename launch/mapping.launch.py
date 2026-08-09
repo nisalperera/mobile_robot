@@ -8,7 +8,7 @@ AMCL and Nav2 are NOT started — use localization_nav.launch.py for those.
 Odometry pipeline
 -----------------
   diff_drive_controller --> /odom/raw
-  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu_fixed/data
+  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu/data
   robot_localization EKF --> /odom  (fused, IMU-stabilised)
   EKF also publishes the odom -> base_footprint TF (publish_odom_tf: false
   in controllers.yaml so only ONE node writes this transform).
@@ -151,9 +151,9 @@ def generate_launch_description():
 
 
     # ── IMU complementary filter (real robot only) ──────────────────────
-    # In sim mode the Ignition IMU bridge publishes on /imu_fixed.
+    # In sim mode the Ignition IMU bridge publishes on /imu.
     # The EKF config expects /imu/data in both modes, so in sim mode
-    # we remap /imu_fixed -> /imu/data on the EKF node (see below).
+    # we remap /imu -> /imu/data on the EKF node (see below).
     imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter.yaml')
     imu_filter = Node(
         package='imu_complementary_filter',
