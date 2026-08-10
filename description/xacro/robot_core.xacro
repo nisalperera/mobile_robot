@@ -8,6 +8,8 @@
     <xacro:include filename="$(find mobile_robot)/description/xacro/left_camera.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/left_wheels.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/right_wheels.xacro" />
+    <!-- IMU sensor: adds imu_link, imu_joint, and Ignition IMU plugin -->
+    <xacro:include filename="$(find mobile_robot)/description/xacro/imu.xacro" />
 
     <!--
         IMPORTANT: base_footprint MUST be declared first so that every URDF

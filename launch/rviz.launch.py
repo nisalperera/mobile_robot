@@ -1,70 +1,82 @@
 import os
+import logging
 
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 from launch import LaunchDescription
 from ament_index_python.packages import get_package_share_directory
 
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import (
-    LaunchConfiguration,
-    PathJoinSubstitution,
-)
+from launch.substitutions import LaunchConfiguration
 
 
-def generate_launch_description():
+logger = logging.getLogger('launch')
 
-    package_name = 'mobile_robot'
 
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    use_ros2_control = LaunchConfiguration('use_ros2_control')
-    rviz_config = LaunchConfiguration('rviz_config')
+def _resolve_rviz_path(context):
+    """Resolve the 'rviz_config' launch arg to an absolute .rviz file path.
 
-    # -------------------------------------------------------------------------
-    # RViz config path
-    #
-    # WRONG (old code):
-    #   rviz_config_file = get_package_share_directory(package_name)
-    #                      + f"/rviz/{rviz_config}.rviz"
-    #
-    #   get_package_share_directory() returns a plain Python string at
-    #   parse-time. LaunchConfiguration('rviz_config') is a substitution
-    #   object — it only resolves to an actual string at launch-time.
-    #   Python f-string concatenation calls str() on the substitution
-    #   object, producing something like:
-    #       "/install/mobile_robot/share/mobile_robot/rviz/
-    #        <launch.substitutions.launch_configuration.LaunchConfiguration
-    #        object at 0x7f...>.rviz"
-    #   RViz receives that nonsense path and silently loads no config.
-    #
-    # CORRECT (fixed):
-    #   PathJoinSubstitution defers all path construction until launch-time
-    #   when every LaunchConfiguration value has been resolved.
-    # -------------------------------------------------------------------------
-    rviz_config_file = PathJoinSubstitution([
-        FindPackageShare(package_name),
-        'rviz',
-        [rviz_config, '.rviz'],   # concatenates the resolved string + '.rviz'
-    ])
+
+    Accepts two forms:
+      1. A plain name (no path separators, no extension), e.g. 'default'
+         -> resolved to <pkg_share>/rviz/<name>.rviz
+      2. An absolute path, e.g. '/tmp/my_arena.rviz'
+         -> used as-is
+
+
+    Raises FileNotFoundError if the resolved path does not exist so the
+    error is clear rather than Ignition silently loading an empty world.
+    """
+    rviz_arg = LaunchConfiguration('rviz_config').perform(context)
+
+
+    if os.path.isabs(rviz_arg):
+        rviz_file = rviz_arg
+    else:
+        pkg_share = get_package_share_directory('mobile_robot')
+        name = rviz_arg if rviz_arg.endswith('.rviz') else f'{rviz_arg}.rviz'
+        rviz_file = os.path.join(pkg_share, 'rviz', name)
+
+
+    if not os.path.isfile(rviz_file):
+        raise FileNotFoundError(
+            f"[rviz.launch.py] RViz config file not found: '{rviz_file}'\n"
+            f"  Searched for RViz config arg value: '{rviz_arg}'\n"
+            f"  Available RViz configs in package:\n"
+            + '\n'.join(
+                f'    {f}' for f in os.listdir(
+                    os.path.join(get_package_share_directory('mobile_robot'), 'rviz')
+                ) if f.endswith('.rviz')
+            )
+        )
+
+    logger.info(f'[rviz.launch.py] Loading RViz config: {rviz_file}')
+    return rviz_file
+
+
+def launch_rviz(context, *args, **kwargs):
+    """Launch RViz with the resolved config file path."""
+    rviz_file = _resolve_rviz_path(context)
+    use_sim_time = LaunchConfiguration('use_sim_time').perform(context).lower() == 'true'
 
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
         name='rviz2',
         output='log',
-        arguments=['-d', rviz_config_file],
+        arguments=['-d', rviz_file],
         parameters=[{'use_sim_time': use_sim_time}],
     )
+
+    return [rviz_node]
+
+
+def generate_launch_description():
 
     launch_description = LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
             description='Use sim time if true'),
-        DeclareLaunchArgument(
-            'use_ros2_control',
-            default_value='true',
-            description='Use ros2_control if true'),
         DeclareLaunchArgument(
             'rviz_config',
             default_value='default',
@@ -73,7 +85,7 @@ def generate_launch_description():
             'robot_description',
             default_value='true',
             description='Launch the robot_description node if true'),
-        rviz_node,
+        OpaqueFunction(function=launch_rviz),
     ])
 
     # Conditionally add YOLO visualiser when ULTRALYTICS=true in the environment

@@ -1,12 +1,19 @@
 controller_manager:
   ros__parameters:
-    # Match Gazebo Ignition physics step (1000 Hz = 0.001 s step).
-    # At 35 Hz the gz_ros2_control plugin warned:
-    #   "Desired controller update period (0.028s) is slower than
-    #    the gazebo simulation period (0.001s)"
-    # and the diff_drive_controller executed so rarely that velocity
-    # commands were silently dropped → robot frozen in Gazebo.
-    update_rate: 1000
+    # 100 Hz is the correct update_rate for the controller manager with
+    # Ignition Gazebo. The physics step runs at 1000 Hz internally, but
+    # gz_ros2_control interpolates between physics steps — the controller
+    # manager does NOT need to match the physics rate.
+    #
+    # Running at 1000 Hz caused ~30% extra CPU usage on the laptop, which
+    # made Gazebo drop below real-time factor 1.0. When sim_time lags
+    # real_time, odom timestamps desync from /scan_fixed timestamps by
+    # up to 100ms -> SLAM TF lookup failures -> spurious map->odom jumps.
+    #
+    # At 100 Hz: controller executes at 10ms intervals (well within the
+    # 50Hz odom publish rate), Gazebo stays at RTF ~1.0, timestamps stay
+    # in sync.
+    update_rate: 100
     use_sim_time: true
 
 
@@ -20,8 +27,9 @@ controller_manager:
 
 diff_drive_controller:
   ros__parameters:
-    # publish_rate can stay lower — this is only the odom/tf publish rate,
-    # not the command execution rate.
+    # publish_rate: odometry and TF publish frequency.
+    # 50 Hz provides smooth odom for SLAM and Nav2 without excessive
+    # /tf bandwidth. Must be <= update_rate (100 Hz).
     publish_rate: 50.0
     use_sim_time: true
 
@@ -34,31 +42,34 @@ diff_drive_controller:
     right_wheel_names: ['right_wheels']
     wheel_separation: 0.35
     wheel_radius: 0.024
+    wheel_separation_multiplier: 1.0
+    wheel_radius_multiplier: 1.0
+
+    # Use joint state feedback (encoder positions/velocities) for odometry.
+    open_loop: false
+
     use_stamped_vel: false
 
 
     # -------------------------------------------------------------------------
-    # TF and odometry frame configuration.
+    # TF and odometry topic configuration.
     #
-    # publish_odom_tf: true  → diff_drive_controller writes the
-    #   odom → base_footprint transform directly onto /tf.
-    #   This is the ONLY publisher of this transform.
-    #   Ignition's /tf bridge has been removed from gz.launch.py to
-    #   prevent the namespaced Gazebo frames (mobile_robot/odom →
-    #   mobile_robot/base_footprint) from clobbering this.
+    # publish_odom: true      -> publishes nav_msgs/Odometry on the topic set
+    #                            by the launch remapping (/odom/raw).
+    #                            EKF subscribes to /odom/raw and publishes the
+    #                            fused result on /odom for SLAM and Nav2.
     #
-    # odom_frame_id: odom    → must match SLAM Toolbox's odom_frame and
-    #                          Nav2's odom topic frame.
-    # base_frame_id: base_footprint → must match the URDF root link.
-    #   The URDF defines base_footprint as root, with base_link as its
-    #   child via a fixed joint published by robot_state_publisher.
-    #   Correct chain:
-    #     map → odom (SLAM/AMCL)
-    #     odom → base_footprint (diff_drive_controller) ← THIS
-    #     base_footprint → base_link (robot_state_publisher, fixed)
-    #     base_link → chassis/wheels/sensors (robot_state_publisher)
+    # publish_odom_tf: FALSE  -> EKF (robot_localization) owns the
+    #                            odom -> base_footprint TF.  If the controller
+    #                            also published this TF there would be two
+    #                            competing transforms on /tf which causes
+    #                            TF tree corruption and lookup errors in SLAM.
+    #
+    # odom_frame_id / base_frame_id are kept as-is so the Odometry message
+    # header is correct; the actual topic is remapped at launch time.
     # -------------------------------------------------------------------------
-    publish_odom_tf: true
+    publish_odom: true
+    publish_odom_tf: false
     odom_frame_id: odom
     base_frame_id: base_footprint
 

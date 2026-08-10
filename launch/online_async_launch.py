@@ -55,5 +55,3 @@ def generate_launch_description():
     ld.add_action(declare_params_file_cmd)
     ld.add_action(log_param_change)
     ld.add_action(start_async_slam_toolbox_node)
-
-    return ld
