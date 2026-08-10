@@ -220,6 +220,13 @@ def launch_gazebo(context, *args, **kwargs):
             # acceleration and falls back to slow software rendering.
             '__NV_PRIME_RENDER_OFFLOAD': '1',
             '__GLX_VENDOR_LIBRARY_NAME': 'nvidia',
+            # Force EGL (used by Ignition's headless/sensor render contexts,
+            # e.g. cameras) onto the NVIDIA ICD too — GLX offload alone doesn't
+            # cover EGL vendor selection on hybrid AMD+NVIDIA laptops, which is
+            # why camera sensors still fell back to the AMD driver and never
+            # published, even with PRIME offload set.
+            '__EGL_VENDOR_LIBRARY_FILENAMES': '/usr/share/glvnd/egl_vendor.d/10_nvidia.json',
+            'VK_ICD_FILENAMES': '/usr/share/vulkan/icd.d/nvidia_icd.json',
         }
     )
     return [gazebo]
