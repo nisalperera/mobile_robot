@@ -98,7 +98,7 @@ BUGFIX (feature/3d-lidar, cont.): pointcloud_to_laserscan.launch.py
 (the converter that publishes /scan from the 3D lidar's /scan_2d/points)
 is now included directly here, alongside scan_frame_fixer, instead of
 being duplicated as a separate include in both mapping.launch.py and
-localization_nav.launch.py. gz.launch.py is included by both of those
+localization.launch.py. gz.launch.py is included by both of those
 parent launch files, so this guarantees the converter and the frame
 fixer always share the same launch lifecycle and /scan is published on
 every direct launch of the sim stack, with no duplicate node instances.
@@ -297,7 +297,7 @@ def generate_launch_description():
     # --- PointCloud -> LaserScan converter (co-located with scan_frame_fixer) --
     # Publishes /scan from the 3D gpu_lidar's bridged /scan_2d/points.
     # Included here (not duplicated in mapping.launch.py /
-    # localization_nav.launch.py) so it always shares scan_frame_fixer's
+    # localization.launch.py) so it always shares scan_frame_fixer's
     # lifecycle -- see BUGFIX note in the module docstring.
     pointcloud_to_laserscan = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(

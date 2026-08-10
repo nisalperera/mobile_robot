@@ -2,7 +2,7 @@
 
 
 Launches the robot in MAPPING mode using SLAM Toolbox (online async).
-AMCL and Nav2 are NOT started — use localization_nav.launch.py for those.
+AMCL and Nav2 are NOT started — use localization.launch.py for those.
 
 
 Odometry pipeline
