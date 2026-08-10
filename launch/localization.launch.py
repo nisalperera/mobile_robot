@@ -248,9 +248,10 @@ def generate_launch_description():
 
     # ── AMCL (localization) ────────────────────────────────────────────────
     amcl_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
+    nav2_bringup_share = get_package_share_directory('nav2_bringup')
     amcl = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_share, 'launch', 'localization.launch.py')
+            os.path.join(nav2_bringup_share, 'launch', 'localization_launch.py')
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,
