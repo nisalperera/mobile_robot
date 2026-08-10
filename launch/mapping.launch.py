@@ -2,7 +2,7 @@
 
 
 Launches the robot in MAPPING mode using SLAM Toolbox (online async).
-AMCL and Nav2 are NOT started — use localization_nav.launch.py for those.
+AMCL and Nav2 are NOT started — use localization.launch.py for those.
 
 
 Odometry pipeline
@@ -56,7 +56,6 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-
 
     package_name = 'mobile_robot'
     pkg_share = get_package_share_directory(package_name)
@@ -267,7 +266,7 @@ def generate_launch_description():
     slam_params_file = os.path.join(pkg_share, 'config', 'mapper_params_online_async.yaml')
     slam = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_share, 'launch', 'online_async_launch.py')
+            os.path.join(pkg_share, 'launch', 'online.async.launch.py')
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,

@@ -1,9 +1,18 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro"
+       xmlns:ignition="http://gazebosim.org/schema">
+    <!--
+        xmlns:ignition namespace above is REQUIRED for the
+        <fdir1 ignition:expressed_in="..."> attribute below to survive
+        xacro processing. On Gazebo Fortress the attribute is
+        "ignition:expressed_in" (Garden+ renames it "gz:expressed_in").
+        NOTE: this declaration must ALSO exist on your main/top-level
+        robot xacro's <robot> tag - see right_wheels.xacro notes.
+    -->
 
     <xacro:include filename="$(find mobile_robot)/description/xacro/inertial_macros.xacro" />
 
-    <!-- Front wheel -->
+    <!-- Front left wheel -->
     <joint name="front_left_wheel_joint" type="continuous">
         <parent link="chassis" />
         <child link="front_left_wheel" />
@@ -28,7 +37,7 @@
         </xacro:inertial_cylinder>
     </link>
 
-    <!-- Rear wheel -->
+    <!-- Rear left wheel -->
     <joint name="rear_left_wheel_joint" type="continuous">
         <parent link="chassis" />
         <child link="rear_left_wheel" />
@@ -53,45 +62,57 @@
         </xacro:inertial_cylinder>
     </link>
 
+
     <!--
-         Ignition Gazebo friction and contact properties for left wheels.
+        Mecanum roller friction emulation (Gazebo Fortress / ODE physics).
+        See right_wheels.xacro for full parameter rationale.
 
-         mu  (ODE mu1) = 1.0  - forward/rolling friction coefficient.
-             Rubber-on-concrete typical value. Prevents the wheel from
-             sliding forward/backward under drive torque.
+        Roller pairing is DIAGONAL, matching the right side:
+          front_left  + rear_right -> Type A, fdir1 = "0.70710678  0.70710678 0"
+          rear_left   + front_right -> Type B, fdir1 = "0.70710678 -0.70710678 0"
 
-         mu2 (ODE mu2) = 0.5  - lateral friction coefficient.
-             Lower than mu1 to allow the lateral scrub a 4-wheel
-             skid-steer robot produces during turns.
-             mu2=0.0 -> wheels slide freely -> phantom lateral velocity
-             in odometry -> SLAM map->odom drift/jumps.
-
-         kp  = 1e6 N/m - contact stiffness (spring constant).
-             Prevents wheels sinking into the ground plane.
-
-         kd  = 1.0 Ns/m - contact damping.
-             Damps bounce at spawn. Without this the robot oscillates
-             vertically after spawn, corrupting the first odom samples.
-
-         minDepth = 0.001 m - minimum penetration before friction fires.
-             Prevents jitter from micro-penetrations at rest.
+        fdir1 is normalized to unit length (1/sqrt(2) ~= 0.70710678) since
+        Gazebo/ODE expects fdir1 to be a unit vector; an un-normalized
+        vector implicitly rescales the friction cone.
     -->
     <gazebo reference="front_left_wheel">
         <material>Gazebo/Black</material>
-        <mu>1.0</mu>
-        <mu1>1.0</mu1>
-        <mu2>0.2</mu2>
-        <fdir1>1 0 0</fdir1>
-        <minDepth>0.001</minDepth>
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>0.02</mu2>
+                        <fdir1 ignition:expressed_in="chassis">0.70710678 0.70710678 0</fdir1>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode>
+                        <min_depth>0.001</min_depth>
+                    </ode>
+                </contact>
+            </surface>
+        </collision>
     </gazebo>
 
     <gazebo reference="rear_left_wheel">
         <material>Gazebo/Black</material>
-        <mu>1.0</mu>
-        <mu1>1.0</mu1>
-        <mu2>0.2</mu2>
-        <fdir1>1 0 0</fdir1>
-        <minDepth>0.001</minDepth>
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>0.02</mu2>
+                        <fdir1 ignition:expressed_in="chassis">0.70710678 -0.70710678 0</fdir1>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode>
+                        <min_depth>0.001</min_depth>
+                    </ode>
+                </contact>
+            </surface>
+        </collision>
     </gazebo>
 
 </robot>

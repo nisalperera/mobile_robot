@@ -1,9 +1,16 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro"
+       xmlns:ignition="http://gazebosim.org/schema">
+    <!--
+        xmlns:ignition namespace above is REQUIRED for the
+        <fdir1 ignition:expressed_in="..."> attribute below to survive
+        xacro processing. On Gazebo Fortress the attribute is
+        "ignition:expressed_in" (Garden+ renames it "gz:expressed_in").
+    -->
 
     <xacro:include filename="$(find mobile_robot)/description/xacro/inertial_macros.xacro" />
 
-    <!-- Front wheel -->
+    <!-- Front right wheel -->
     <joint name="front_right_wheel_joint" type="continuous">
         <parent link="chassis" />
         <child link="front_right_wheel" />
@@ -28,7 +35,7 @@
         </xacro:inertial_cylinder>
     </link>
 
-    <!-- Rear wheel -->
+    <!-- Rear right wheel -->
     <joint name="rear_right_wheel_joint" type="continuous">
         <parent link="chassis" />
         <child link="rear_right_wheel" />
@@ -54,25 +61,63 @@
     </link>
 
     <!--
-         Ignition Gazebo friction and contact properties for right wheels.
-         See left_wheels.xacro for full parameter rationale.
+        Mecanum roller friction emulation (Gazebo Fortress / ODE physics).
+
+        Real 45-deg rollers are NOT modeled as geometry here - instead we
+        keep the plain cylinder collision and fake roller behavior with
+        anisotropic friction:
+          - mu1 (high, along fdir1) = the wheel's effective push direction,
+            i.e. the direction force actually gets transmitted to the ground.
+          - mu2 (near zero, auto-computed orthogonal to fdir1) = the
+            roller's free-slip axis, letting the wheel "skate" sideways.
+
+        Roller pairing is DIAGONAL, not left/right:
+          front_right + rear_left   -> Type B, fdir1 = "0.70710678 -0.70710678 0"
+          front_left  + rear_right  -> Type A, fdir1 = "0.70710678  0.70710678 0"
+
+        fdir1 is expressed_in="chassis" so the vector means the same thing
+        regardless of each wheel link's own rotated joint frame. It is
+        normalized to unit length (1/sqrt(2) ~= 0.70710678) since
+        Gazebo/ODE expects fdir1 to be a unit vector.
     -->
     <gazebo reference="front_right_wheel">
         <material>Gazebo/Black</material>
-        <mu>1.0</mu>
-        <mu1>1.0</mu1>
-        <mu2>0.2</mu2>
-        <fdir1>1 0 0</fdir1>
-        <minDepth>0.001</minDepth>
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>0.02</mu2>
+                        <fdir1 ignition:expressed_in="chassis">0.70710678 -0.70710678 0</fdir1>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode>
+                        <min_depth>0.001</min_depth>
+                    </ode>
+                </contact>
+            </surface>
+        </collision>
     </gazebo>
 
     <gazebo reference="rear_right_wheel">
         <material>Gazebo/Black</material>
-        <mu>1.0</mu>
-        <mu1>1.0</mu1>
-        <mu2>0.2</mu2>
-        <fdir1>1 0 0</fdir1>
-        <minDepth>0.001</minDepth>
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>0.02</mu2>
+                        <fdir1 ignition:expressed_in="chassis">0.70710678 0.70710678 0</fdir1>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode>
+                        <min_depth>0.001</min_depth>
+                    </ode>
+                </contact>
+            </surface>
+        </collision>
     </gazebo>
 
 </robot>

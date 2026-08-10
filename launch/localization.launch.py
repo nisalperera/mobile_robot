@@ -1,4 +1,4 @@
-"""localization_nav.launch.py
+"""localization.launch.py
 
 
 Launches the robot in LOCALIZATION + NAVIGATION mode using AMCL + Nav2.
@@ -23,7 +23,7 @@ use_ros2_control: true (default) | false
 map             : path to map YAML file
                   (default: <package>/maps/map_save.yaml)
 headless        : true (default) | false
-    true  → does not launch RViz.
+    false  → launch RViz.
 world           : world name or absolute path (default: ignition_world)
     Name is resolved to <pkg_share>/worlds/<name>.world automatically.
     e.g. world:=house_world  or  world:=/tmp/my_arena.world
@@ -31,20 +31,21 @@ world           : world name or absolute path (default: ignition_world)
 
 Example (Laptop — simulation)
 -----------------------------
-    ros2 launch mobile_robot localization_nav.launch.py
-    ros2 launch mobile_robot localization_nav.launch.py world:=house_world
+    ros2 launch mobile_robot localization.launch.py
+    ros2 launch mobile_robot localization.launch.py world:=house_world
 
 
     # With a custom map:
-    ros2 launch mobile_robot localization_nav.launch.py \\
+    ros2 launch mobile_robot localization.launch.py \\
         world:=house_world map:=/path/to/house_map.yaml
 
 
 Example (Jetson — real robot)
 ------------------------------
-    ros2 launch mobile_robot localization_nav.launch.py \\
+    ros2 launch mobile_robot localization.launch.py \\
         sim_mode:=false use_sim_time:=false \\
-        map:=/home/jetson/maps/my_map.yaml
+        map:=/home/jetson/maps/my_map.yaml \\
+        headless:=true
 """
 
 
@@ -201,8 +202,6 @@ def generate_launch_description():
         condition=IfCondition(sim_mode),
         parameters=[ekf_params_file, {'use_sim_time': use_sim_time}],
         remappings=[
-            # Gazebo bridge publishes raw wheel odom on /odom
-            ('/odom/raw', '/odom'),
             # Ignition IMU bridge publishes on /imu_fixed, not /imu_fixed/data
             ('/imu_fixed/data', '/imu_fixed'),
             # EKF fused output -> /odom (consumed by AMCL + Nav2)
@@ -317,7 +316,7 @@ def generate_launch_description():
             ),
         ),
         LogInfo(msg=(
-            '[localization_nav.launch.py] Mode: LOCALIZATION+NAV — AMCL + Nav2 active, '
+            '[localization.launch.py] Mode: LOCALIZATION+NAV — AMCL + Nav2 active, '
             'EKF fusing /odom/raw + /imu_fixed/data -> /odom, SLAM NOT started.'
         )),
         # ── RSP (all modes) ──────────────────────────────────────────────

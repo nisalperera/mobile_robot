@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+
     <!-- =====================================================================
          REAL ROBOT: esp32_hardware/L298Hardware
          Active when sim_mode:=false (use_ros2_control:=true on real hardware)
@@ -59,19 +60,32 @@
         </ros2_control>
     </xacro:unless>
 
+
     <!-- =====================================================================
-         SIMULATION: gz_ros2_control/GazeboSimSystem
+         SIMULATION: mecanum_ign_hardware/MecanumSystem
          Active when sim_mode:=true
-         FIX: Plugin filename corrected for ROS2 Humble + Ignition Fortress:
-              Use libign_ros2_control-system.so from the ign_ros2_control package.
-              Install: sudo apt install ros-humble-ign-ros2-control
+
+         Exposes only 2 VIRTUAL joints (left_wheels, right_wheels) to
+         diff_drive_controller. The plugin internally fans each commanded
+         velocity out to the 4 REAL wheel joints (passed as <param>
+         entries below) and aggregates their feedback back into the 2
+         virtual joint states. See the mecanum_ign_hardware package.
+
+         NOTE: base class is gz_ros2_control::GazeboSimSystemInterface,
+         NOT ign_ros2_control::IgnitionSystemInterface - the ign_ros2_control
+         package on Humble 0.7.x+ is a deprecated stub with no real headers.
+         The <gazebo><plugin> loader below has been updated to match.
          ===================================================================== -->
     <xacro:if value="$(arg sim_mode)">
         <ros2_control name="IgnitionSystem" type="system">
             <hardware>
-                <plugin>ign_ros2_control/IgnitionSystem</plugin>
+                <plugin>mecanum_ign_hardware/MecanumSystem</plugin>
+                <param name="front_left_wheel_joint">front_left_wheel_joint</param>
+                <param name="rear_left_wheel_joint">rear_left_wheel_joint</param>
+                <param name="front_right_wheel_joint">front_right_wheel_joint</param>
+                <param name="rear_right_wheel_joint">rear_right_wheel_joint</param>
             </hardware>
-            <joint name="front_left_wheel_joint">
+            <joint name="left_wheels">
                 <command_interface name="velocity">
                     <param name="min">-20</param>
                     <param name="max">20</param>
@@ -79,23 +93,7 @@
                 <state_interface name="velocity"/>
                 <state_interface name="position"/>
             </joint>
-            <joint name="front_right_wheel_joint">
-                <command_interface name="velocity">
-                    <param name="min">-20</param>
-                    <param name="max">20</param>
-                </command_interface>
-                <state_interface name="velocity"/>
-                <state_interface name="position"/>
-            </joint>
-            <joint name="rear_left_wheel_joint">
-                <command_interface name="velocity">
-                    <param name="min">-20</param>
-                    <param name="max">20</param>
-                </command_interface>
-                <state_interface name="velocity"/>
-                <state_interface name="position"/>
-            </joint>
-            <joint name="rear_right_wheel_joint">
+            <joint name="right_wheels">
                 <command_interface name="velocity">
                     <param name="min">-20</param>
                     <param name="max">20</param>
@@ -106,21 +104,26 @@
         </ros2_control>
     </xacro:if>
 
+
     <!-- =====================================================================
-         Ignition Fortress ros2_control plugin
-         FIX: Corrected plugin name for ROS2 Humble + Ignition Fortress.
-              ign_ros2_control::IgnitionROS2ControlPlugin is the correct
-              fully-qualified plugin class for this version combination.
-              Package: ros-humble-ign-ros2-control
+         Gazebo Fortress ros2_control system plugin loader
+         FIX: ros-humble-ign-ros2-control 0.7.20+ is a deprecated stub
+              with no headers/implementation on this system (confirmed:
+              ign_system_interface.hpp does not exist under /opt/ros).
+              Switched to gz_ros2_control::GazeboSimROS2ControlPlugin /
+              libgz_ros2_control-system.so, which matches the base class
+              our MecanumSystem hardware plugin actually inherits from.
+              Package: ros-humble-gz-ros2-control
          ===================================================================== -->
     <gazebo>
-        <plugin name="ign_ros2_control::IgnitionROS2ControlPlugin"
-                filename="libign_ros2_control-system.so">
+        <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin"
+                filename="libgz_ros2_control-system.so">
             <parameters>$(find mobile_robot)/config/controllers.yaml</parameters>
             <parameters>$(find mobile_robot)/config/gaz_ros2_ctl_use_sim.yaml</parameters>
             <robot_param>robot_description</robot_param>
             <robot_param_node>robot_state_publisher</robot_param_node>
         </plugin>
     </gazebo>
+
 
 </robot>
