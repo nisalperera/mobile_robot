@@ -57,7 +57,6 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
 
-
     package_name = 'mobile_robot'
     pkg_share = get_package_share_directory(package_name)
 
