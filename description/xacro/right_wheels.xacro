@@ -72,11 +72,13 @@
             roller's free-slip axis, letting the wheel "skate" sideways.
 
         Roller pairing is DIAGONAL, not left/right:
-          front_right + rear_left   -> Type B, fdir1 = "1 -1 0"
-          front_left  + rear_right  -> Type A, fdir1 = "1  1 0"
+          front_right + rear_left   -> Type B, fdir1 = "0.70710678 -0.70710678 0"
+          front_left  + rear_right  -> Type A, fdir1 = "0.70710678  0.70710678 0"
 
         fdir1 is expressed_in="chassis" so the vector means the same thing
-        regardless of each wheel link's own rotated joint frame.
+        regardless of each wheel link's own rotated joint frame. It is
+        normalized to unit length (1/sqrt(2) ~= 0.70710678) since
+        Gazebo/ODE expects fdir1 to be a unit vector.
     -->
     <gazebo reference="front_right_wheel">
         <material>Gazebo/Black</material>
@@ -86,7 +88,7 @@
                     <ode>
                         <mu>1.0</mu>
                         <mu2>0.02</mu2>
-                        <fdir1 ignition:expressed_in="chassis">1 -1 0</fdir1>
+                        <fdir1 ignition:expressed_in="chassis">0.70710678 -0.70710678 0</fdir1>
                     </ode>
                 </friction>
                 <contact>
@@ -106,7 +108,7 @@
                     <ode>
                         <mu>1.0</mu>
                         <mu2>0.02</mu2>
-                        <fdir1 ignition:expressed_in="chassis">1 1 0</fdir1>
+                        <fdir1 ignition:expressed_in="chassis">0.70710678 0.70710678 0</fdir1>
                     </ode>
                 </friction>
                 <contact>

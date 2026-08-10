@@ -62,13 +62,18 @@
         </xacro:inertial_cylinder>
     </link>
 
+
     <!--
         Mecanum roller friction emulation (Gazebo Fortress / ODE physics).
         See right_wheels.xacro for full parameter rationale.
 
         Roller pairing is DIAGONAL, matching the right side:
-          front_left  + rear_right -> Type A, fdir1 = "1  1 0"
-          rear_left   + front_right -> Type B, fdir1 = "1 -1 0"
+          front_left  + rear_right -> Type A, fdir1 = "0.70710678  0.70710678 0"
+          rear_left   + front_right -> Type B, fdir1 = "0.70710678 -0.70710678 0"
+
+        fdir1 is normalized to unit length (1/sqrt(2) ~= 0.70710678) since
+        Gazebo/ODE expects fdir1 to be a unit vector; an un-normalized
+        vector implicitly rescales the friction cone.
     -->
     <gazebo reference="front_left_wheel">
         <material>Gazebo/Black</material>
@@ -78,7 +83,7 @@
                     <ode>
                         <mu>1.0</mu>
                         <mu2>0.02</mu2>
-                        <fdir1 ignition:expressed_in="chassis">1 1 0</fdir1>
+                        <fdir1 ignition:expressed_in="chassis">0.70710678 0.70710678 0</fdir1>
                     </ode>
                 </friction>
                 <contact>
@@ -98,7 +103,7 @@
                     <ode>
                         <mu>1.0</mu>
                         <mu2>0.02</mu2>
-                        <fdir1 ignition:expressed_in="chassis">1 -1 0</fdir1>
+                        <fdir1 ignition:expressed_in="chassis">0.70710678 -0.70710678 0</fdir1>
                     </ode>
                 </friction>
                 <contact>
