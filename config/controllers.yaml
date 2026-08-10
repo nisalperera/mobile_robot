@@ -16,11 +16,14 @@ controller_manager:
     update_rate: 100
     use_sim_time: true
 
+
     diff_drive_controller:
       type: diff_drive_controller/DiffDriveController
 
+
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
+
 
 diff_drive_controller:
   ros__parameters:
@@ -30,39 +33,14 @@ diff_drive_controller:
     publish_rate: 50.0
     use_sim_time: true
 
-    left_wheel_names:  ['front_left_wheel_joint',  'rear_left_wheel_joint']
-    right_wheel_names: ['front_right_wheel_joint', 'rear_right_wheel_joint']
-    wheels_per_side: 2
 
-    # -------------------------------------------------------------------------
-    # Wheel geometry — measured from URDF xacro.
-    #
-    # wheel_radius: 0.024 m  — cylinder radius in left/right_wheels.xacro.
-    #
-    # wheel_separation: 0.350 m  — lateral distance between left and right
-    #   wheel centrelines (left Y=+0.175, right Y=-0.175 relative to base_link).
-    #
-    # wheel_separation_multiplier: corrects the odometry arc error introduced
-    #   by using diff_drive_controller (a 2-wheel model) on a 4-wheel robot.
-    #
-    #   The robot has a 0.20 m wheelbase:
-    #     front wheels: X = +0.250 m (relative to chassis/base_link)
-    #     rear  wheels: X = +0.050 m (relative to chassis/base_link)
-    #   Effective virtual axle X = average = +0.150 m.
-    #
-    #   During a turn, the front and rear wheel pairs trace arcs of different
-    #   radii. Gazebo simulates each contact patch independently (correct).
-    #   diff_drive_controller averages the front+rear encoder velocities and
-    #   applies a single 2-wheel odometry formula (approximate).
-    #
-    #   Tune empirically:
-    #     1. Drive a 1-metre square in Gazebo with use_slam:=false.
-    #     2. Compare final pose in /odom vs Gazebo ground-truth (gz service).
-    #     3. If robot over-rotates in odom: decrease toward 0.95.
-    #        If robot under-rotates in odom: increase toward 1.10.
-    #   Typical range for a 4-wheel skid-steer: 0.95-1.08.
-    # -------------------------------------------------------------------------
-    wheel_separation: 0.350
+    # With mecanum_ign_hardware/MecanumSystem, the 4 real wheels are
+    # fanned out INSIDE the hardware plugin's write()/read() -- the
+    # controller only sees 2 virtual joints and does not need to
+    # average front/rear pairs itself, so wheels_per_side is removed.
+    left_wheel_names: ['left_wheels']
+    right_wheel_names: ['right_wheels']
+    wheel_separation: 0.35
     wheel_radius: 0.024
     wheel_separation_multiplier: 1.0
     wheel_radius_multiplier: 1.0
@@ -71,6 +49,7 @@ diff_drive_controller:
     open_loop: false
 
     use_stamped_vel: false
+
 
     # -------------------------------------------------------------------------
     # TF and odometry topic configuration.
@@ -94,41 +73,22 @@ diff_drive_controller:
     odom_frame_id: odom
     base_frame_id: base_footprint
 
+
     command_interfaces:
       - velocity
     state_interfaces:
       - velocity
       - position
 
-    # -------------------------------------------------------------------------
-    # Odometry covariances
-    # Diagonal entries for [x, y, z, roll, pitch, yaw].
-    # For a ground robot z/roll/pitch are near-zero -> very tight.
-    # x/y/yaw loosened to reflect real encoder + wheel slip uncertainty.
-    # These values feed into the EKF as odom0 measurement noise.
-    # -------------------------------------------------------------------------
-    pose_covariance_diagonal:  [0.001, 0.001, 1e-9, 1e-9, 1e-9, 0.01]
-    twist_covariance_diagonal: [0.001, 1e-9,  1e-9, 1e-9, 1e-9, 0.01]
-
-    linear:
-      x:
-        has_velocity_limits: true
-        max_velocity: 1.0      # m/s
-        min_velocity: -1.0     # m/s
-        has_acceleration_limits: true
-        max_acceleration: 1.0  # m/s^2
-        min_acceleration: -1.0 # m/s^2
-
-    angular:
-      z:
-        has_velocity_limits: true
-        max_velocity: 1.0      # rad/s  (set your own value here)
-        has_acceleration_limits: true
-        max_acceleration: 1.0  # rad/s^2
 
 joint_state_broadcaster:
   ros__parameters:
     publish_rate: 50.0
+    # NO CHANGE to this joints list -- MecanumSystem now exports real
+    # state interfaces (position/velocity) under these 4 exact joint
+    # names IN ADDITION TO the 2 virtual left_wheels/right_wheels used
+    # by diff_drive_controller above, so this broadcaster keeps working
+    # as before and RViz continues showing all 4 wheels spin correctly.
     joints:
       - front_left_wheel_joint
       - front_right_wheel_joint
