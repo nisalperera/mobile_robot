@@ -72,7 +72,7 @@
          virtual joint states. See the mecanum_ign_hardware package.
 
          NOTE: base class is gz_ros2_control::GazeboSimSystemInterface,
-         NOT ign_ros2_control::IgnitionSystemInterface -- the ign_ros2_control
+         NOT ign_ros2_control::IgnitionSystemInterface - the ign_ros2_control
          package on Humble 0.7.x+ is a deprecated stub with no real headers.
          The <gazebo><plugin> loader below has been updated to match.
          ===================================================================== -->
