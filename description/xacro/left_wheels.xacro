@@ -1,9 +1,18 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro"
+       xmlns:ignition="http://gazebosim.org/schema">
+    <!--
+        xmlns:ignition namespace above is REQUIRED for the
+        <fdir1 ignition:expressed_in="..."> attribute below to survive
+        xacro processing. On Gazebo Fortress the attribute is
+        "ignition:expressed_in" (Garden+ renames it "gz:expressed_in").
+        NOTE: this declaration must ALSO exist on your main/top-level
+        robot xacro's <robot> tag - see right_wheels.xacro notes.
+    -->
 
     <xacro:include filename="$(find mobile_robot)/description/xacro/inertial_macros.xacro" />
 
-    <!-- Front wheel -->
+    <!-- Front left wheel -->
     <joint name="front_left_wheel_joint" type="continuous">
         <parent link="chassis" />
         <child link="front_left_wheel" />
@@ -28,7 +37,7 @@
         </xacro:inertial_cylinder>
     </link>
 
-    <!-- Rear wheel -->
+    <!-- Rear left wheel -->
     <joint name="rear_left_wheel_joint" type="continuous">
         <parent link="chassis" />
         <child link="rear_left_wheel" />
@@ -53,13 +62,52 @@
         </xacro:inertial_cylinder>
     </link>
 
+    <!--
+        Mecanum roller friction emulation (Gazebo Fortress / ODE physics).
+        See right_wheels.xacro for full parameter rationale.
+
+        Roller pairing is DIAGONAL, matching the right side:
+          front_left  + rear_right -> Type A, fdir1 = "1  1 0"
+          rear_left   + front_right -> Type B, fdir1 = "1 -1 0"
+    -->
+    <gazebo reference="front_left_wheel">
+        <material>Gazebo/Black</material>
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>0.02</mu2>
+                        <fdir1 ignition:expressed_in="chassis">1 1 0</fdir1>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode>
+                        <min_depth>0.001</min_depth>
+                    </ode>
+                </contact>
+            </surface>
+        </collision>
+    </gazebo>
 
     <gazebo reference="rear_left_wheel">
         <material>Gazebo/Black</material>
-    </gazebo>
-
-    <gazebo reference="front_left_wheel">
-        <material>Gazebo/Black</material>
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>0.02</mu2>
+                        <fdir1 ignition:expressed_in="chassis">1 -1 0</fdir1>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode>
+                        <min_depth>0.001</min_depth>
+                    </ode>
+                </contact>
+            </surface>
+        </collision>
     </gazebo>
 
 </robot>
