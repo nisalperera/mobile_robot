@@ -206,7 +206,7 @@ def generate_launch_description():
 
     slam_real = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_share, 'launch', 'online_async_launch.py')
+            os.path.join(pkg_share, 'launch', 'online.async.launch.py')
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,
@@ -220,7 +220,7 @@ def generate_launch_description():
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    os.path.join(pkg_share, 'launch', 'online_async_launch.py')
+                    os.path.join(pkg_share, 'launch', 'online.async.launch.py')
                 ),
                 launch_arguments={
                     'use_sim_time': use_sim_time,
