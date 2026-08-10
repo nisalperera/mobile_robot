@@ -22,9 +22,18 @@ previous test's ROS2/Ignition session (or a colliding topic remap) left
 more than one publisher, or if 0 publishers are found (e.g. mismatched
 ROS_DOMAIN_ID between shells), it refuses to proceed and explains why.
 
+It additionally verifies there is AT LEAST ONE subscriber on
+/diff_drive_controller/cmd_vel_unstamped before publishing any command.
+cmd_log entries and publisher-side timing are NOT sufficient evidence that
+the command is actually being consumed -- rclpy happily lets you publish
+into the void, so without this check a "healthy-looking" cmd_log could be
+recorded even though nothing downstream (e.g. diff_drive_controller) is
+listening, which would otherwise be misread as a controller/physics
+problem instead of a wiring/launch problem.
 
-The motion timer is only created (via start_motion()) AFTER this check
-succeeds, and the odometry callback ignores messages until then, so the
+
+The motion timer is only created (via start_motion()) AFTER these checks
+succeed, and the odometry callback ignores messages until then, so the
 DDS discovery polling itself cannot consume part of the test duration or
 set the t=0 reference point prematurely.
 
@@ -178,6 +187,51 @@ def check_single_publisher(node: "Node", topic: str, timeout_s: float = 10.0) ->
 
 
 
+def check_has_subscriber(node: "Node", topic: str, timeout_s: float = 10.0) -> int:
+    """
+    Poll for up to `timeout_s` seconds for AT LEAST ONE subscriber on `topic`
+    (the command topic this script is about to publish into). Publishing
+    into a topic with zero subscribers succeeds silently in ROS 2 -- the
+    cmd_log this script records, and the timing of those publish calls,
+    would look identical whether or not diff_drive_controller (or anything
+    else) is actually receiving the commands. Without this check a wiring
+    problem (wrong ROS_DOMAIN_ID, controller not spawned, wrong remap) would
+    be misdiagnosed as a controller/physics rotation-dropout issue instead.
+    Aborts the diagnostic if no subscriber appears within the timeout.
+    """
+    deadline = time.time() + timeout_s
+    last_count = -1
+    while time.time() < deadline:
+        rclpy.spin_once(node, timeout_sec=0.3)
+        infos = node.get_subscriptions_info_by_topic(topic)
+        count = len(infos)
+        if count != last_count:
+            names = ', '.join(i.node_name for i in infos) if infos else '(none yet)'
+            print(f"  ...discovered {count} subscriber(s) so far: {names}")
+            last_count = count
+        if count >= 1:
+            print(f"  OK: {count} subscriber(s) on {topic}")
+            return count
+
+
+    print(
+        f"\nERROR: Expected at least 1 subscriber on {topic}, found 0 "
+        f"after {timeout_s}s of discovery.\n\n"
+        "Publishing a command to a topic with no subscriber succeeds "
+        "silently -- cmd_log would look 'healthy' even though nothing is "
+        "actually receiving the motion command, which would otherwise be "
+        "misdiagnosed as a controller/physics rotation dropout instead of "
+        "a wiring problem. Check:\n"
+        "    ros2 topic info {} --verbose\n"
+        "    ros2 node list   # is diff_drive_controller running?\n"
+        "    echo $ROS_DOMAIN_ID   # matches the shell that launched the sim?\n"
+        "before relaunching the sim and re-running this script.".format(topic),
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+
 class RotationDropoutDiagnostics(Node):
     def __init__(self, linear_x: float, angular_z: float, duration: float,
                  publish_rate_hz: float = 10.0):
@@ -208,6 +262,14 @@ class RotationDropoutDiagnostics(Node):
         self._motion_timer = None
         self._stop_timer = None  # set once motion begins
 
+        # BUGFIX: guards the shutdown race between a concurrently-running
+        # _publish_cmd timer callback and stop_motion()'s zero-velocity
+        # publish. Both run on the same rclpy executor thread, so a plain
+        # Lock is sufficient (no risk of the lock itself deadlocking the
+        # callback that holds it).
+        self._shutdown_lock = threading.Lock()
+        self._stopped = False
+
 
     def start_motion(self):
         """Begin the actual timed test. Call only after
@@ -219,6 +281,21 @@ class RotationDropoutDiagnostics(Node):
         self._motion_timer = self.create_timer(1.0 / self._publish_rate_hz, self._publish_cmd)
 
 
+    def stop_motion(self):
+        """Cancel the motion timer and publish a single zero-velocity Twist,
+        serialized against any in-flight _publish_cmd callback via
+        _shutdown_lock so a nonzero Twist can never be published AFTER this
+        stop command. Safe to call multiple times (idempotent) and safe to
+        call even if start_motion() was never invoked."""
+        with self._shutdown_lock:
+            if self._stopped:
+                return
+            self._stopped = True
+            if self._motion_timer is not None:
+                self._motion_timer.cancel()
+            self.cmd_pub.publish(Twist())
+
+
     def _now_t(self) -> float:
         now = time.time()
         if self.start_time is None:
@@ -227,34 +304,44 @@ class RotationDropoutDiagnostics(Node):
 
 
     def _publish_cmd(self):
-        t = self._now_t()
-        if t >= self.duration:
-            # stop the robot and stop publishing further motion commands
+        # BUGFIX: hold _shutdown_lock for the whole publish so stop_motion()
+        # (running on another thread/callback) cannot interleave its own
+        # zero-velocity publish between this method reading self._stopped
+        # and it actually calling self.cmd_pub.publish() below -- that
+        # interleaving is exactly what could let a nonzero Twist land on
+        # the topic after the zero-velocity stop command.
+        with self._shutdown_lock:
+            if self._stopped:
+                return
+            t = self._now_t()
+            if t >= self.duration:
+                # stop the robot and stop publishing further motion commands
+                msg = Twist()
+                self.cmd_pub.publish(msg)
+                self.cmd_log.append({
+                    "t": round(t, 4),
+                    "lin_x_commanded": msg.linear.x,
+                    "ang_z_commanded": msg.angular.z,
+                })
+                if self._motion_timer is not None:
+                    self._motion_timer.cancel()
+                return
             msg = Twist()
+            msg.linear.x = self.linear_x
+            msg.angular.z = self.angular_z
             self.cmd_pub.publish(msg)
+            # BUGFIX: log immediately after the actual publish call, with the
+            # actual values just sent, instead of a separate timer
+            # (_log_cmd, removed) that independently re-derived what SHOULD
+            # have been commanded at its own sampling schedule. That decoupled
+            # the "commanded" log from what was truly published, so it could
+            # never actually catch a publisher-health problem -- it only
+            # ever tested its own copy of the intended schedule.
             self.cmd_log.append({
                 "t": round(t, 4),
                 "lin_x_commanded": msg.linear.x,
                 "ang_z_commanded": msg.angular.z,
             })
-            self._motion_timer.cancel()
-            return
-        msg = Twist()
-        msg.linear.x = self.linear_x
-        msg.angular.z = self.angular_z
-        self.cmd_pub.publish(msg)
-        # BUGFIX: log immediately after the actual publish call, with the
-        # actual values just sent, instead of a separate timer
-        # (_log_cmd, removed) that independently re-derived what SHOULD
-        # have been commanded at its own sampling schedule. That decoupled
-        # the "commanded" log from what was truly published, so it could
-        # never actually catch a publisher-health problem -- it only
-        # ever tested its own copy of the intended schedule.
-        self.cmd_log.append({
-            "t": round(t, 4),
-            "lin_x_commanded": msg.linear.x,
-            "ang_z_commanded": msg.angular.z,
-        })
 
 
     def _odom_cb(self, msg: Odometry):
@@ -406,9 +493,10 @@ def main():
                          help="Seconds to wait for DDS discovery of the odom "
                               "topic publisher before giving up (default: 10.0)")
     parser.add_argument("--skip-publisher-check", action="store_true",
-                         help="Skip the single-publisher safety check (NOT recommended — "
-                              "results will be meaningless if a zombie process or a "
-                              "colliding topic remap is present)")
+                         help="Skip the single-publisher AND command-subscriber safety "
+                              "checks (NOT recommended — results will be meaningless if "
+                              "a zombie process, a colliding topic remap, or a missing "
+                              "command-topic subscriber is present)")
     args = parser.parse_args()
 
 
@@ -425,6 +513,10 @@ def main():
         print("\n[0/4] Checking for a single publisher on the odom topic "
               "(guards against leftover/zombie processes or colliding remaps)...")
         check_single_publisher(node, WHEEL_ODOM_TOPIC, timeout_s=args.publisher_check_timeout)
+
+        print("\n[0/4] Checking for a subscriber on the command topic "
+              "(guards against publishing into the void)...")
+        check_has_subscriber(node, CONTROLLER_CMD_TOPIC, timeout_s=args.publisher_check_timeout)
 
 
     print(f"\n  Commanding linear.x={args.linear_x}, angular.z={args.angular_z} "
@@ -449,11 +541,11 @@ def main():
         # cleanly even on Ctrl+C or an unexpected exception raised above
         # -- mirrors the try/finally safety pattern already used in
         # calibrate_wheel_separation_multiplier.py's perform_motion().
-        # Without this, an interrupted script could leave the robot still
-        # executing its last received (possibly nonzero) Twist command.
-        if node._motion_timer is not None:
-            node._motion_timer.cancel()
-        node.cmd_pub.publish(Twist())
+        # Uses stop_motion(), which serializes timer cancellation and the
+        # zero-velocity publish against any in-flight _publish_cmd
+        # callback via _shutdown_lock, so a nonzero Twist can never be
+        # published after this stop command.
+        node.stop_motion()
         rclpy.shutdown()
         spin_thread.join(timeout=2.0)
 
