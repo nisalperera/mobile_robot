@@ -79,6 +79,7 @@ def generate_launch_description():
     map_yaml = LaunchConfiguration('map')
     headless = LaunchConfiguration('headless')
     world = LaunchConfiguration('world')
+    use_joystick = LaunchConfiguration('enable_joystick')
 
 
     # ── Robot State Publisher (always runs — sim AND real robot) ────────
@@ -233,6 +234,7 @@ def generate_launch_description():
             os.path.join(pkg_share, 'launch', 'joystick.launch.py')
         ),
         launch_arguments={'use_sim_time': use_sim_time}.items(),
+        condition=IfCondition(use_joystick),
     )
 
 
@@ -314,6 +316,11 @@ def generate_launch_description():
                 'World to load in Gazebo. Accepts a name from worlds/ or an '
                 'absolute path. e.g. world:=house_world'
             ),
+        ),
+        DeclareLaunchArgument(
+            'enable_joystick',
+            default_value='true',
+            description='Set false to disable joystick/teleop entirely during autonomous-only runs',
         ),
         LogInfo(msg=(
             '[localization.launch.py] Mode: LOCALIZATION+NAV — AMCL + Nav2 active, '

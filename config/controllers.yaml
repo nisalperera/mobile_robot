@@ -33,6 +33,7 @@ diff_drive_controller:
     publish_rate: 50.0
     use_sim_time: true
 
+    # cmd_vel_timeout: 2.0   # seconds — tolerate publish jitter without zeroing velocity
 
     # With mecanum_ign_hardware/MecanumSystem, the 4 real wheels are
     # fanned out INSIDE the hardware plugin's write()/read() -- the
