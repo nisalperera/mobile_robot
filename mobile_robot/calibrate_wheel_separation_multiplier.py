@@ -206,6 +206,23 @@ def perform_motion(linear_x: float, angular_z: float, duration: float):
 
 
 
+def publish_stop():
+    """Publish a single zero-velocity Twist directly to the controller
+    command topic. Used as the safety fallback whenever the calibration
+    flow aborts before or during perform_motion(), so a rejected/invalid
+    request can never leave a nonzero command latched on the topic."""
+    stop_cmd = [
+        "ros2", "topic", "pub", CONTROLLER_CMD_TOPIC,
+        "geometry_msgs/msg/Twist",
+        "{linear: {x: 0.0}, angular: {z: 0.0}}", "--once",
+    ]
+    try:
+        run_capture(stop_cmd, timeout=5.0)
+    except RuntimeError as e:
+        print(f"  WARNING: failed to publish safety stop: {e}", file=sys.stderr)
+
+
+
 # --------------------------------------------------------------------------
 # Math
 # --------------------------------------------------------------------------
@@ -251,13 +268,6 @@ def compute_multiplier(
     ratio = delta_yaw_odom / delta_yaw_truth
 
 
-    # Net displacement (only meaningful for --mode arc; harmless to compute
-    # for --mode spin too, since it should be ~0 there). This is the
-    # straight-line start-to-end displacement between the BEFORE/AFTER
-    # snapshots, NOT the cumulative path length actually traveled along
-    # the (possibly curved) trajectory -- this script only takes two
-    # point-in-time snapshots, so it has no way to integrate the real
-    # path length.
     dx_truth = truth_after["x"] - truth_before["x"]
     dy_truth = truth_after["y"] - truth_before["y"]
     dx_odom = odom_after["x"] - odom_before["x"]
@@ -350,6 +360,26 @@ def run_automated(mode: str, linear_x: float, angular_z: float, duration: float,
     print("=" * 70)
 
 
+    # BUGFIX: validate `duration` before anything else -- before
+    # expected_rotation_rad is computed and before perform_motion() can
+    # publish any motion command. A non-finite (NaN/inf) or non-positive
+    # duration would otherwise flow straight into
+    # expected_rotation_rad = abs(angular_z) * duration
+    # (silently producing NaN, or a non-positive value that always passes
+    # the ">= math.pi" guard below) and then into perform_motion(), which
+    # would either publish motion for an invalid/nonsensical time or skip
+    # the stop command entirely. Reject here, but still issue the
+    # zero-velocity safety stop before raising, since some prior state
+    # (a previous run, a stuck publisher) may have left the robot moving.
+    if not math.isfinite(duration) or duration <= 0:
+        publish_stop()
+        raise ValueError(
+            f"Invalid --duration={duration!r}: must be a finite, positive "
+            "number of seconds. No motion was commanded; a zero-velocity "
+            "stop was published as a precaution."
+        )
+
+
     # BUGFIX: reject a planned rotation of >= 180 deg BEFORE moving the
     # robot at all. normalize_angle() wraps any yaw delta to (-pi, pi],
     # so a true rotation of pi or more is aliased (e.g. +200 deg reads
@@ -358,6 +388,7 @@ def run_automated(mode: str, linear_x: float, angular_z: float, duration: float,
     # IMPORTANT note in the module docstring.
     expected_rotation_rad = abs(angular_z) * duration
     if expected_rotation_rad >= math.pi:
+        publish_stop()
         raise ValueError(
             f"Requested rotation ~{math.degrees(expected_rotation_rad):.1f} deg "
             f"(angular_z={angular_z} rad/s x duration={duration}s) is >= 180 deg.\n"
