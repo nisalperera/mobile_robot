@@ -21,8 +21,8 @@ sim_mode        : true (default) | false
 use_sim_time    : true (default) | false
 use_ros2_control: true (default) | false
 map             : path to map YAML file
-                  (default: <package>/maps/map_save.yaml)
-headless        : true (default) | false
+                  (default: <package>/maps/house_world_map.yaml)
+headless        : false (default) | true
     false  → launch RViz.
 world           : world name or absolute path (default: ignition_world)
     Name is resolved to <pkg_share>/worlds/<name>.world automatically.
@@ -79,6 +79,7 @@ def generate_launch_description():
     map_yaml = LaunchConfiguration('map')
     headless = LaunchConfiguration('headless')
     world = LaunchConfiguration('world')
+    use_joystick = LaunchConfiguration('enable_joystick')
 
 
     # ── Robot State Publisher (always runs — sim AND real robot) ────────
@@ -114,7 +115,6 @@ def generate_launch_description():
         }.items(),
         condition=IfCondition(sim_mode),
     )
-
 
     # ── ros2_control + spawners (real-robot only) ────────────────────────
     controller_params_file = os.path.join(pkg_share, 'config', 'controllers.yaml')
@@ -234,6 +234,7 @@ def generate_launch_description():
             os.path.join(pkg_share, 'launch', 'joystick.launch.py')
         ),
         launch_arguments={'use_sim_time': use_sim_time}.items(),
+        condition=IfCondition(use_joystick),
     )
 
 
@@ -249,9 +250,10 @@ def generate_launch_description():
 
     # ── AMCL (localization) ────────────────────────────────────────────────
     amcl_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
+    nav2_bringup_share = get_package_share_directory('nav2_bringup')
     amcl = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_share, 'launch', 'localization.launch.py')
+            os.path.join(nav2_bringup_share, 'launch', 'localization_launch.py')
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,
@@ -299,7 +301,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'map',
-            default_value=os.path.join(pkg_share, 'maps', 'map_save.yaml'),
+            default_value=os.path.join(pkg_share, 'maps', 'house_world_map.yaml'),
             description='Full path to the pre-built map YAML file',
         ),
         DeclareLaunchArgument(
@@ -314,6 +316,11 @@ def generate_launch_description():
                 'World to load in Gazebo. Accepts a name from worlds/ or an '
                 'absolute path. e.g. world:=house_world'
             ),
+        ),
+        DeclareLaunchArgument(
+            'enable_joystick',
+            default_value='true',
+            description='Set false to disable joystick/teleop entirely during autonomous-only runs',
         ),
         LogInfo(msg=(
             '[localization.launch.py] Mode: LOCALIZATION+NAV — AMCL + Nav2 active, '
