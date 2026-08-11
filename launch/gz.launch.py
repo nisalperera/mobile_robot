@@ -206,29 +206,36 @@ def launch_gazebo(context, *args, **kwargs):
         existing_resource_path,
     ]))
 
+    additional_env={
+        'IGN_GAZEBO_SYSTEM_PLUGIN_PATH': plugin_paths,
+        'IGN_GAZEBO_RESOURCE_PATH':      resource_paths,
+        # BUGFIX (map-rotation-fix): force rendering onto the NVIDIA
+        # discrete GPU via PRIME render offload. Without this,
+        # Ignition defaults to the AMD integrated GPU driver stack,
+        # which on this hardware fails to initialize hardware
+        # acceleration and falls back to slow software rendering.
+        '__NV_PRIME_RENDER_OFFLOAD': '1',
+        '__GLX_VENDOR_LIBRARY_NAME': 'nvidia'
+    }
+
+    
+    egl_manifest = '/usr/share/glvnd/egl_vendor.d/10_nvidia.json'
+    vk_manifest = '/usr/share/vulkan/icd.d/nvidia_icd.json'
+    if os.path.exists(egl_manifest):
+        additional_env['__EGL_VENDOR_LIBRARY_FILENAMES'] = egl_manifest
+    if os.path.exists(vk_manifest):
+        additional_env['VK_ICD_FILENAMES'] = vk_manifest
+    if not (os.path.exists(egl_manifest) and os.path.exists(vk_manifest)):
+        logger.warning('[gz.launch.py] NVIDIA EGL/Vulkan manifests not found — '
+              'camera rendering may fall back to the integrated GPU. '
+              'Install the NVIDIA driver/runtime for full acceleration.')
 
     gazebo = ExecuteProcess(
         cmd=['ign', 'gazebo'] + gz_args.split(),
         output='screen',
-        additional_env={
-            'IGN_GAZEBO_SYSTEM_PLUGIN_PATH': plugin_paths,
-            'IGN_GAZEBO_RESOURCE_PATH':      resource_paths,
-            # BUGFIX (map-rotation-fix): force rendering onto the NVIDIA
-            # discrete GPU via PRIME render offload. Without this,
-            # Ignition defaults to the AMD integrated GPU driver stack,
-            # which on this hardware fails to initialize hardware
-            # acceleration and falls back to slow software rendering.
-            '__NV_PRIME_RENDER_OFFLOAD': '1',
-            '__GLX_VENDOR_LIBRARY_NAME': 'nvidia',
-            # Force EGL (used by Ignition's headless/sensor render contexts,
-            # e.g. cameras) onto the NVIDIA ICD too — GLX offload alone doesn't
-            # cover EGL vendor selection on hybrid AMD+NVIDIA laptops, which is
-            # why camera sensors still fell back to the AMD driver and never
-            # published, even with PRIME offload set.
-            '__EGL_VENDOR_LIBRARY_FILENAMES': '/usr/share/glvnd/egl_vendor.d/10_nvidia.json',
-            'VK_ICD_FILENAMES': '/usr/share/vulkan/icd.d/nvidia_icd.json',
-        }
+        additional_env=additional_env
     )
+
     return [gazebo]
 
 
