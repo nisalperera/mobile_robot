@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<!--
+  Example URDF/Xacro: 4x ZED 2 stereo camera mount on a square mobile robot chassis.
+  Cameras are placed at the center of each chassis side (front, right, back, left),
+  facing outward, to achieve ~360-degree overlapping coverage.
+
+  Assumptions (edit to match your robot):
+    - Square chassis, side length = 0.50 m (so half-side = 0.25 m)
+    - Camera mount height above base_link origin = 0.20 m
+    - ZED 2 horizontal FOV ~= 110 degrees, so adjacent cameras (90 deg apart)
+      overlap by roughly 20 degrees on each side.
+
+  Requires the Stereolabs zed-ros2-wrapper package for zed_macro.urdf.xacro.
+  https://github.com/stereolabs/zed-ros2-wrapper
+-->
+<robot name="four_zed_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ==================== Chassis parameters ==================== -->
+  <xacro:property name="half_side" value="0.25"/>   <!-- meters, edit to match chassis -->
+  <xacro:property name="cam_height" value="0.20"/>  <!-- meters above base_link -->
+  <xacro:property name="cam_model" value="zed2"/>
+
+  <!-- ==================== Base link ==================== -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.50 0.50 0.15"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.6 0.6 0.6 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.50 0.50 0.15"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="10.0"/>
+      <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== Include ZED macro ==================== -->
+  <xacro:include filename="$(find zed_wrapper)/urdf/zed_macro.urdf.xacro"/>
+
+  <!-- ==================== Front camera (facing +X, 0 deg) ==================== -->
+  <xacro:zed_camera name="zed_front" model="${cam_model}"/>
+  <joint name="zed_front_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="zed_front_camera_link"/>
+    <origin xyz="${half_side} 0.0 ${cam_height}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ==================== Right camera (facing -Y, -90 deg / 270 deg) ==================== -->
+  <xacro:zed_camera name="zed_right" model="${cam_model}"/>
+  <joint name="zed_right_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="zed_right_camera_link"/>
+    <origin xyz="0.0 -${half_side} ${cam_height}" rpy="0 0 -1.5707963"/>
+  </joint>
+
+  <!-- ==================== Back camera (facing -X, 180 deg) ==================== -->
+  <xacro:zed_camera name="zed_back" model="${cam_model}"/>
+  <joint name="zed_back_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="zed_back_camera_link"/>
+    <origin xyz="-${half_side} 0.0 ${cam_height}" rpy="0 0 3.1415927"/>
+  </joint>
+
+  <!-- ==================== Left camera (facing +Y, 90 deg) ==================== -->
+  <xacro:zed_camera name="zed_left" model="${cam_model}"/>
+  <joint name="zed_left_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="zed_left_camera_link"/>
+    <origin xyz="0.0 ${half_side} ${cam_height}" rpy="0 0 1.5707963"/>
+  </joint>
+
+</robot>
+
+<!--
+  Notes:
+  1. Each camera's optical axis points outward, normal to its mounting side.
+     rpy yaw values (0, -90, 180, 90 deg in radians) rotate each camera to face
+     away from the chassis center along +X, -Y, -X, +Y respectively.
+
+  2. To fuse the 4 camera streams into one map, either:
+     a) Run zed_multi_camera launch (zed-ros2-wrapper) with a shared reference
+        link and let robot_localization / zed_multi_camera fuse odometry, or
+     b) Feed each camera's point cloud into a custom multi-camera visual SLAM
+        pipeline (e.g., adapting DROID-SLAM per stream + joint bundle adjustment)
+        as described in multi-camera indoor mapping literature.
+
+  3. Verify actual overlap angle with your specific chassis dimensions:
+     overlap_deg = camera_fov_deg - 90
+     For ZED2 (110 deg FOV) on a square chassis (90 deg between adjacent
+     camera axes): overlap = 110 - 90 = 20 degrees per seam.
+
+  4. Adjust cam_height and half_side to match your real robot's dimensions
+     before deploying. Verify with `check_urdf` and visualize in RViz2
+     before running on hardware.
+-->
