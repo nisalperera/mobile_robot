@@ -1,17 +1,17 @@
 <?xml version="1.0"?>
 <!--
-  Example URDF/Xacro: 4x ZED 2 stereo camera mount on a square mobile robot chassis.
-  Cameras are placed at the center of each chassis side (front, right, back, left),
-  facing outward, to achieve ~360-degree overlapping coverage.
+  Corrected example: 4x ZED 2 stereo camera mount on a square mobile robot chassis.
 
-  Assumptions (edit to match your robot):
-    - Square chassis, side length = 0.50 m (so half-side = 0.25 m)
-    - Camera mount height above base_link origin = 0.20 m
-    - ZED 2 horizontal FOV ~= 110 degrees, so adjacent cameras (90 deg apart)
-      overlap by roughly 20 degrees on each side.
+  Verified against the actual zed_macro.urdf.xacro source (stereolabs/zed-ros2-wrapper,
+  master branch). Real macro signature:
+    params="name=zed model=zed enable_gnss=false custom_baseline=0 *gnss_origin"
 
-  Requires the Stereolabs zed-ros2-wrapper package for zed_macro.urdf.xacro.
-  https://github.com/stereolabs/zed-ros2-wrapper
+  Key facts:
+  - There is NO "parent" attribute on this macro. It only creates a standalone
+    "${name}_camera_link" link; you must attach it to your robot yourself via
+    a separate fixed joint.
+  - The "*gnss_origin" block parameter has no default, so xacro requires a
+    block to be passed even when enable_gnss=false (it's simply unused then).
 -->
 <robot name="four_zed_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
@@ -45,15 +45,19 @@
   <xacro:include filename="$(find zed_wrapper)/urdf/zed_macro.urdf.xacro"/>
 
   <!-- ==================== Front camera (facing +X, 0 deg) ==================== -->
-  <xacro:zed_camera name="zed_front" model="${cam_model}"/>
+  <xacro:zed_camera name="zed_front" model="${cam_model}">
+    <origin xyz="0 0 0" rpy="0 0 0"/>  <!-- unused placeholder for gnss_origin -->
+  </xacro:zed_camera>
   <joint name="zed_front_joint" type="fixed">
     <parent link="base_link"/>
     <child link="zed_front_camera_link"/>
     <origin xyz="${half_side} 0.0 ${cam_height}" rpy="0 0 0"/>
   </joint>
 
-  <!-- ==================== Right camera (facing -Y, -90 deg / 270 deg) ==================== -->
-  <xacro:zed_camera name="zed_right" model="${cam_model}"/>
+  <!-- ==================== Right camera (facing -Y, -90 deg) ==================== -->
+  <xacro:zed_camera name="zed_right" model="${cam_model}">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:zed_camera>
   <joint name="zed_right_joint" type="fixed">
     <parent link="base_link"/>
     <child link="zed_right_camera_link"/>
@@ -61,7 +65,9 @@
   </joint>
 
   <!-- ==================== Back camera (facing -X, 180 deg) ==================== -->
-  <xacro:zed_camera name="zed_back" model="${cam_model}"/>
+  <xacro:zed_camera name="zed_back" model="${cam_model}">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:zed_camera>
   <joint name="zed_back_joint" type="fixed">
     <parent link="base_link"/>
     <child link="zed_back_camera_link"/>
@@ -69,7 +75,9 @@
   </joint>
 
   <!-- ==================== Left camera (facing +Y, 90 deg) ==================== -->
-  <xacro:zed_camera name="zed_left" model="${cam_model}"/>
+  <xacro:zed_camera name="zed_left" model="${cam_model}">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:zed_camera>
   <joint name="zed_left_joint" type="fixed">
     <parent link="base_link"/>
     <child link="zed_left_camera_link"/>
@@ -80,23 +88,21 @@
 
 <!--
   Notes:
-  1. Each camera's optical axis points outward, normal to its mounting side.
-     rpy yaw values (0, -90, 180, 90 deg in radians) rotate each camera to face
-     away from the chassis center along +X, -Y, -X, +Y respectively.
+  1. Each zed_camera call creates "<name>_camera_link", "<name>_camera_center",
+     "<name>_left_camera_frame", "<name>_right_camera_frame", and their
+     optical frames, all internally relative to "<name>_camera_link".
+     Your external joint below each macro call is what actually positions
+     that whole camera assembly on your chassis.
 
-  2. To fuse the 4 camera streams into one map, either:
-     a) Run zed_multi_camera launch (zed-ros2-wrapper) with a shared reference
-        link and let robot_localization / zed_multi_camera fuse odometry, or
-     b) Feed each camera's point cloud into a custom multi-camera visual SLAM
-        pipeline (e.g., adapting DROID-SLAM per stream + joint bundle adjustment)
-        as described in multi-camera indoor mapping literature.
+  2. The nested <origin xyz="0 0 0" rpy="0 0 0"/> inside each <xacro:zed_camera>
+     block is a required placeholder for the "*gnss_origin" block parameter.
+     It has no effect unless you also pass enable_gnss="true".
 
-  3. Verify actual overlap angle with your specific chassis dimensions:
-     overlap_deg = camera_fov_deg - 90
-     For ZED2 (110 deg FOV) on a square chassis (90 deg between adjacent
-     camera axes): overlap = 110 - 90 = 20 degrees per seam.
+  3. Overlap math unchanged: ZED2 FOV (~110 deg) - 90 deg spacing between
+     adjacent camera axes = ~20 deg overlap per seam on a square chassis.
 
-  4. Adjust cam_height and half_side to match your real robot's dimensions
-     before deploying. Verify with `check_urdf` and visualize in RViz2
-     before running on hardware.
+  4. If your local zed_wrapper install differs from this master-branch source
+     (e.g., older tagged release), re-verify with:
+       grep -n 'xacro:macro name="zed_camera"' \
+         $(ros2 pkg prefix zed_wrapper)/share/zed_wrapper/urdf/zed_macro.urdf.xacro
 -->
