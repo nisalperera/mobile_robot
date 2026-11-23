@@ -1,22 +1,26 @@
 # ekf.yaml
 #
 # Extended Kalman Filter (EKF) configuration for robot_localization.
-# Fuses wheel encoder odometry (/odom/raw) with IMU data (/imu/data)
+# Fuses wheel encoder odometry (/diff_drive_controller/odom) with IMU data
 # to produce a stable, IMU-corrected odometry on /odom.
 #
-# Topic flow:
-#   diff_drive_controller  -->  /odom/raw   (raw wheel encoder odom)
-#   imu_complementary_filter -> /imu/data   (filtered orientation + ang vel)
-#   ekf_filter_node        -->  /odom       (fused output consumed by SLAM + Nav2)
-#   ekf_filter_node        -->  /tf         (odom -> base_footprint TF)
+# Topic flow (simulation mode):
+#   diff_drive_controller  -->  /diff_drive_controller/odom  (wheel encoder odom)
+#   Ignition IMU bridge    -->  /imu_fixed                   (IMU data)
+#   ekf_filter_node        -->  /odom                        (fused output for SLAM/Nav2)
+#   ekf_filter_node        -->  /tf                          (odom -> base_footprint)
 #
-# Install:  sudo apt install ros-foxy-robot-localization
+# Topic flow (real robot mode):
+#   diff_drive_controller  -->  /diff_drive_controller/odom  (wheel encoder odom)
+#   imu_complementary_filter -> /imu_fixed/data              (IMU data)
+#   ekf_filter_node        -->  /odom                        (fused output)
 #
-# Run on: Jetson Xavier NX (real robot)
-#         Laptop / sim mode: set use_sim_time: true via launch argument
+# Install:  sudo apt install ros-humble-robot-localization
 #
-# Documentation: https://docs.ros.org/en/foxy/p/robot_localization/
-
+# Run on: Jetson Xavier NX (real robot with esp32_hardware)
+#         Docker container (simulation with Gazebo Ignition)
+#
+# Documentation: https://docs.ros.org/en/humble/p/robot_localization/
 ekf_filter_node:
   ros__parameters:
 
@@ -51,9 +55,9 @@ ekf_filter_node:
 
     # -------------------------------------------------------------------------
     # odom0: raw wheel encoder odometry from diff_drive_controller
-    # Topic is remapped to /odom/raw in the launch file.
+    # Topic is /diff_drive_controller/odom by default.
     # -------------------------------------------------------------------------
-    odom0: /odom/raw
+    odom0: /diff_drive_controller/odom
 
     # odom0_config: which states to USE from this message.
     # Rows:  x      y      z
@@ -88,7 +92,7 @@ ekf_filter_node:
     # Remapping is handled in the launch file so this topic name is
     # consistent in both sim and real modes.
     # -------------------------------------------------------------------------
-    imu0: /imu/data
+    imu0: /imu_fixed
 
     # imu0_config: which states to USE from this message.
     # We use:
@@ -161,24 +165,6 @@ ekf_filter_node:
       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1.0
     ]
 
-# ekf_filter_node:
-#   ros__parameters:
-#     frequency: 30.0
-#     two_d_mode: true
-#     publish_tf: true
-#     odom_frame: odom
-#     base_link_frame: base_footprint
-#     world_frame: odom
-
-#     odom0: /odom/raw
-#     odom0_config: [false, false, false,
-#                    false, false, false,
-#                    true,  true,  false,
-#                    false, false, true,
-#                    false, false, false]
-
-#     imu0: imu
-#     imu0_config: [false, false, false,
 #                   false, false, false,
 #                   false, false, false,
 #                   false, false, true,

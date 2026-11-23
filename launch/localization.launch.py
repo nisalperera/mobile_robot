@@ -90,6 +90,7 @@ def generate_launch_description():
         name='robot_state_publisher',
         output='both',
         parameters=[{
+            'use_sim_time': use_sim_time,
             'robot_description': ParameterValue(
                 Command([
                     'xacro', ' ', xacro_file,
@@ -134,9 +135,6 @@ def generate_launch_description():
     )
 
 
-    # Remap /diff_drive_controller/odom -> /odom/raw so the EKF can
-    # subscribe to the raw wheel encoder odometry on a separate topic
-    # from the fused /odom output that AMCL and Nav2 consume.
     diff_drive_spawner = Node(
         package='controller_manager',
         executable='spawner',
@@ -144,9 +142,6 @@ def generate_launch_description():
         condition=UnlessCondition(sim_mode),
         arguments=['diff_drive_controller'],
         parameters=[{'use_sim_time': use_sim_time}],
-        remappings=[
-            ('/diff_drive_controller/odom', '/odom/raw'),
-        ],
     )
 
 
@@ -161,20 +156,22 @@ def generate_launch_description():
 
 
     # ── IMU complementary filter (real robot only) ───────────────────────
-    # In sim mode the Ignition IMU bridge publishes on /imu_fixed.
-    # The EKF config expects /imu_fixed/data in both modes, so in sim mode
-    # we remap /imu_fixed -> /imu_fixed/data on the EKF node (see below).
     imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter.yaml')
+    # Hardware-only IMU interface:
+    # /imu/data_raw -> complementary filter -> /imu/data.
     imu_filter = Node(
         package='imu_complementary_filter',
         executable='complementary_filter_node',
         name='imu_complementary_filter',
         output='screen',
         condition=UnlessCondition(sim_mode),
-        parameters=[imu_filter_params, {'use_sim_time': use_sim_time}],
+        parameters=[
+            imu_filter_params,
+            {'use_sim_time': use_sim_time},
+        ],
         remappings=[
-            ('/imu_fixed/data_raw', '/imu_fixed/data_raw'),
-            ('/imu_fixed/data',     '/imu_fixed/data'),
+            ('imu/data_raw', '/imu/data_raw'),
+            ('imu/data', '/imu/data'),
         ],
     )
 
@@ -200,29 +197,48 @@ def generate_launch_description():
         name='ekf_filter_node',
         output='screen',
         condition=IfCondition(sim_mode),
-        parameters=[ekf_params_file, {'use_sim_time': use_sim_time}],
+        parameters=[
+            ekf_params_file,
+            {
+                'use_sim_time': use_sim_time,
+                # Interim simulation contract: consume the verified
+                # controller topic directly; fused output remains /odom.
+                'odom0': '/diff_drive_controller/odom',
+                'imu0': '/imu_fixed',
+                'imu0_config': [
+                    False, False, False,
+                    False, False, False,
+                    False, False, False,
+                    False, False, True,
+                    False, False, False,
+                ],
+                'imu0_remove_gravitational_acceleration': False,
+            },
+        ],
         remappings=[
-            # Ignition IMU bridge publishes on /imu_fixed, not /imu_fixed/data
-            ('/imu_fixed/data', '/imu_fixed'),
             # EKF fused output -> /odom (consumed by AMCL + Nav2)
             ('odometry/filtered', '/odom'),
         ],
     )
 
 
+    # Hardware inputs are explicit and do not inherit the sim IMU topic.
+    # Source configuration only; physical operation is not validated.
     ekf_node_real = Node(
         package='robot_localization',
         executable='ekf_node',
         name='ekf_filter_node',
         output='screen',
         condition=UnlessCondition(sim_mode),
-        parameters=[ekf_params_file, {'use_sim_time': use_sim_time}],
+        parameters=[
+            ekf_params_file,
+            {
+                'use_sim_time': use_sim_time,
+                'odom0': '/diff_drive_controller/odom',
+                'imu0': '/imu/data',
+            },
+        ],
         remappings=[
-            # diff_drive_spawner remaps /diff_drive_controller/odom -> /odom/raw
-            ('/odom/raw', '/odom/raw'),
-            # imu_complementary_filter publishes on /imu_fixed/data
-            ('/imu_fixed/data', '/imu_fixed/data'),
-            # EKF fused output -> /odom
             ('odometry/filtered', '/odom'),
         ],
     )
@@ -277,7 +293,10 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', 'rviz.launch.py')
         ),
-        launch_arguments={'use_sim_time': use_sim_time}.items(),
+        launch_arguments={
+            'use_sim_time': use_sim_time, 
+            'rviz_config': os.path.join(pkg_share, 'rviz', 'maps.rviz')
+        }.items(),
         condition=UnlessCondition(headless),
     )
 

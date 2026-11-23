@@ -1,67 +1,102 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro"
        xmlns:ignition="http://gazebosim.org/schema">
-
     <xacro:include filename="$(find mobile_robot)/description/xacro/colors.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/inertial_macros.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/lidar.xacro" />
-    <xacro:include filename="$(find mobile_robot)/description/xacro/right_camera.xacro" />
-    <xacro:include filename="$(find mobile_robot)/description/xacro/left_camera.xacro" />
+    <xacro:include filename="$(find mobile_robot)/description/xacro/front_camera.xacro" />
+    <xacro:include filename="$(find mobile_robot)/description/xacro/right_cameras.xacro" />
+    <xacro:include filename="$(find mobile_robot)/description/xacro/left_cameras.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/left_wheels.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/right_wheels.xacro" />
     <xacro:include filename="$(find mobile_robot)/description/xacro/imu.xacro" />
 
-    <!--
-        IMPORTANT: base_footprint MUST be declared first so that every URDF
-        parser (including ROS2 Foxy's urdf_parser) correctly identifies it as
-        the root link. The root is determined by finding a link that never
-        appears as a <child> in any joint. If base_link is declared first,
-        older parsers may pick it as root and publish base_link→base_footprint
-        (inverted), which breaks the entire TF chain:
-          map → odom → base_footprint → base_link  (correct)
-          map → odom → base_link → base_footprint  (WRONG — breaks Nav2 / SLAM)
-    -->
+    <!-- SI units. Plate X/Y confirmed by user. Thickness, motor dimensions,
+         and mass remain unmeasured simulation approximations.
+         Wheel radius MUST match both existing wheel Xacros; changing this
+         property alone does not resize wheels or update controller settings. -->
+    <xacro:property name="chassis_length" value="0.350" />
+    <xacro:property name="chassis_width" value="0.300" />
+    <xacro:property name="chassis_thickness" value="0.003" />
+    <xacro:property name="chassis_mass" value="0.5" />
+    <xacro:property name="ground_wheel_radius" value="0.024" />
+    <xacro:property name="plate_center_x" value="0.15" />
+    <!-- Plate underside is 15 mm ABOVE motor/wheel axes. -->
+    <xacro:property name="plate_underside_z" value="0.015" />
+    <xacro:property name="plate_center_z"
+                    value="${plate_underside_z + chassis_thickness / 2}" />
 
-    <!-- Virtual root link: no geometry, no inertia, sits on the ground plane -->
-    <link name="base_footprint"/>
+    <material name="chassis_aluminium"><color rgba="0.72 0.74 0.77 1" /></material>
+    <material name="motor_steel"><color rgba="0.50 0.52 0.55 1" /></material>
+    <material name="mount_dark"><color rgba="0.10 0.10 0.11 1" /></material>
 
-    <!-- base_footprint → base_link (fixed, zero offset) -->
+    <!-- Ground reference for a flat floor, with wheel axes one radius above it.
+         Keep base_link/chassis at axle height; do not also lift wheel joints. -->
+    <link name="base_footprint" />
     <joint name="base_footprint_joint" type="fixed">
-        <parent link="base_footprint"/>
-        <child  link="base_link"/>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <parent link="base_footprint" />
+        <child link="base_link" />
+        <origin xyz="0 0 ${ground_wheel_radius}" rpy="0 0 0" />
     </joint>
-
-    <link name="base_link"/>
-
-    <!-- base_link → chassis -->
+    <link name="base_link" />
     <joint name="chassis_joint" type="fixed">
-        <parent link="base_link"/>
-        <child  link="chassis"/>
-        <origin xyz="-0.1 0 0"/>
+        <parent link="base_link" />
+        <child link="chassis" />
+        <origin xyz="-0.1 0 0" />
     </joint>
+
+    <!-- Decorative assemblies: no separate mass, collision, or driven joints.
+         Existing wheel centers and axes are preserved. Motors lie below plate.
+         Bracket feet touch the plate underside; uprights extend downward. -->
+    <xacro:macro name="chassis_motor_visual" params="prefix x side">
+        <visual name="${prefix}_motor">
+            <origin xyz="${x} ${side * 0.110} 0" rpy="${pi/2} 0 0" />
+            <geometry><cylinder radius="0.012" length="0.050" /></geometry>
+            <material name="motor_steel" />
+        </visual>
+        <visual name="${prefix}_gearbox">
+            <origin xyz="${x} ${side * 0.142} 0" />
+            <geometry><box size="0.026 0.014 0.026" /></geometry>
+            <material name="chassis_aluminium" />
+        </visual>
+        <visual name="${prefix}_shaft">
+            <origin xyz="${x} ${side * 0.156} 0" rpy="${pi/2} 0 0" />
+            <geometry><cylinder radius="0.003" length="0.014" /></geometry>
+            <material name="motor_steel" />
+        </visual>
+        <visual name="${prefix}_mount_foot">
+            <origin xyz="${x} ${side * 0.126} ${plate_underside_z - 0.0015}" />
+            <geometry><box size="0.036 0.042 0.003" /></geometry>
+            <material name="mount_dark" />
+        </visual>
+        <visual name="${prefix}_mount_upright">
+            <origin xyz="${x} ${side * 0.134} ${plate_underside_z - 0.003 - 0.0125}" />
+            <geometry><box size="0.036 0.003 0.025" /></geometry>
+            <material name="mount_dark" />
+        </visual>
+    </xacro:macro>
 
     <link name="chassis">
-        <visual>
-            <origin xyz="0.15 0 0.075"/>
-            <geometry>
-                <box size="0.3 0.3 0.15"/>
-            </geometry>
-            <material name="white"/>
+        <!-- Simplified solid sheet; slots, bolts, wiring, sensor supports and
+             actual mecanum roller geometry are outside this correction.
+             Sensor transforms relative to chassis are unchanged. -->
+        <visual name="chassis_plate">
+            <origin xyz="${plate_center_x} 0 ${plate_center_z}" />
+            <geometry><box size="${chassis_length} ${chassis_width} ${chassis_thickness}" /></geometry>
+            <material name="chassis_aluminium" />
         </visual>
-        <collision>
-            <origin xyz="0.15 0 0.075"/>
-            <geometry>
-                <box size="0.3 0.3 0.15"/>
-            </geometry>
+        <collision name="chassis_plate_collision">
+            <origin xyz="${plate_center_x} 0 ${plate_center_z}" />
+            <geometry><box size="${chassis_length} ${chassis_width} ${chassis_thickness}" /></geometry>
         </collision>
-        <xacro:inertial_box mass="0.5" x="0.3" y="0.3" z="0.15">
-            <origin xyz="0.15 0 0.075" rpy="0 0 0"/>
+        <!-- Placeholder lumped plate-envelope inertia, not calibrated hardware. -->
+        <xacro:inertial_box mass="${chassis_mass}"
+                            x="${chassis_length}" y="${chassis_width}" z="${chassis_thickness}">
+            <origin xyz="${plate_center_x} 0 ${plate_center_z}" rpy="0 0 0" />
         </xacro:inertial_box>
+        <xacro:chassis_motor_visual prefix="front_left" x="0.25" side="1" />
+        <xacro:chassis_motor_visual prefix="rear_left" x="0.05" side="1" />
+        <xacro:chassis_motor_visual prefix="front_right" x="0.25" side="-1" />
+        <xacro:chassis_motor_visual prefix="rear_right" x="0.05" side="-1" />
     </link>
-
-    <gazebo reference="chassis">
-        <material>Gazebo/White</material>
-    </gazebo>
-
 </robot>

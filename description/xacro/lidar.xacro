@@ -1,103 +1,67 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-
+    <!-- SLAMTEC RPLIDAR C1, simplified planar scan model.
+      Sources: https://www.slamtec.com/en/c1
+               https://www.waveshare.com/wiki/RPLIDAR_C1
+      Envelope 55.6x55.6x41.3 mm approximated by cylinder (NOT exact CAD).
+      Mass 0.10 kg is an UNVERIFIED placeholder retained from previous lidar.
+      Selected scan rate 10 Hz; 500 samples/revolution approximates 5000/s.
+      Limits .05-12m are nominal: reflectance-dependent range, timing, angular
+      jitter, reflectivity and hardware noise are NOT reproduced.
+      User diagram central XY mount; chosen scan-plane Z=.110 is provisional.
+      Assumed optical plane 31.3 mm above housing bottom, not surveyed.
+      Housing bottom Z=.0787; top=.120; camera tops=.074, so planar beam clears
+      proposed camera housings. Pedestal connects plate Z=.018 to .0787.
+      Keep legacy sensor name, laser_frame and scan_2d topic for current launch.
+      Single vertical ring replaces old 32-ring 3D lidar. Point cloud topic can
+      remain scan_2d/points, but actual output must be verified in Gazebo.
+    -->
     <joint name="laser_joint" type="fixed">
-        <parent link="chassis"/>
-        <child  link="laser_frame"/>
-        <origin xyz="0.122 0 0.212" rpy="0 0 0"/>
+        <parent link="chassis"/><child link="laser_frame"/>
+        <origin xyz="0.150 0 0.110" rpy="0 0 0"/>
     </joint>
-
     <link name="laser_frame">
         <visual>
-            <geometry>
-                <cylinder radius="0.05" length="0.04"/>
-            </geometry>
+            <origin xyz="0 0 -0.01065"/>
+            <geometry><cylinder radius="0.0278" length="0.0413"/></geometry>
+            <material name="black"/>
         </visual>
         <collision>
-            <geometry>
-                <cylinder radius="0.05" length="0.04"/>
-            </geometry>
+            <origin xyz="0 0 -0.01065"/>
+            <geometry><cylinder radius="0.0278" length="0.0413"/></geometry>
         </collision>
-        <xacro:inertial_cylinder mass="0.1" length="0.04" radius="0.05">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+        <!-- Visual-only pedestal: no added mass or collision. -->
+        <visual>
+            <origin xyz="0 0 -0.06165"/>
+            <geometry><cylinder radius="0.008" length="0.0607"/></geometry>
+            <material name="black"/>
+        </visual>
+        <xacro:inertial_cylinder mass="0.1" length="0.0413" radius="0.0278">
+            <origin xyz="0 0 -0.01065" rpy="0 0 0"/>
         </xacro:inertial_cylinder>
     </link>
-
-    <!--
-        Ignition Fortress gpu_lidar sensor, now configured as a 3D LIDAR.
-
-        CRITICAL: use <lidar> child element, NOT <ray>.
-        <ray> is Gazebo Classic syntax. Ignition silently ignores it,
-        the topic exists and the bridge connects, but zero messages
-        are ever published.
-
-        The world-level Sensors plugin (ignition_world.world) drives
-        this sensor. No <plugin> block is needed here. render_engine
-        ogre2 (set in ignition_world.world) is what GPU-accelerates
-        this sensor; type="gpu_lidar" rasterizes all rays on the GPU
-        instead of the CPU-based "lidar"/"ray" sensor types.
-
-        Coverage (per feature/3d-lidar, updated):
-          Horizontal: 150 deg total, centered on the robot's front
-            (+X of laser_frame), i.e. +/-75 deg = +/-1.308997 rad.
-            690 samples (~0.218 deg/sample), double the previous
-            345-sample density.
-          Vertical:   60 deg total. Rays START at the LIDAR's own
-            level (0 rad = the horizontal plane through the sensor,
-            perpendicular to the sensor's vertical axis) and sweep
-            UP to +60 deg (1.047198 rad). min_vertical_angle is 0,
-            NOT -30/+30, so no rays point below the sensor's plane.
-            32 rings (~1.94 deg/ring), double the previous 16 rings.
-          Total rays/scan: 690 x 32 = 22,080 (4x the original 5,520);
-            watch GPU load on machines without working hardware
-            acceleration, see amdgpu fallback notes in gz.launch.py.
-
-        Topic renamed from 'scan' to 'scan_2d': this sensor has multiple
-        vertical rings, so Ignition's native LaserScan serialization
-        on this topic is degenerate/unusable (LaserScan can only carry
-        one ring). Ignition publishes:
-          - /scan_2d         (ignition.msgs.LaserScan; degenerate 3D dump,
-                               not used directly by any consumer)
-          - /scan_2d/points  (ignition.msgs.PointCloudPacked; the real
-                               3D data, bridged to ROS as PointCloud2)
-        pointcloud_to_laserscan.launch.py consumes /scan_2d/points and
-        republishes a proper single-ring 2D LaserScan on ROS topic
-        /scan, which scan_frame_fixer (in gz.launch.py) then rewrites
-        to /scan_fixed for SLAM Toolbox / Nav2, exactly as it did
-        before this sensor became 3D.
-    -->
     <gazebo reference="laser_frame">
-        <material>Gazebo/Red</material>
-
+        <material>Gazebo/Black</material>
         <sensor name="laser" type="gpu_lidar">
             <pose>0 0 0 0 0 0</pose>
-            <update_rate>10</update_rate>
-            <always_on>1</always_on>
-            <visualize>false</visualize>
-            <topic>scan_2d</topic>
+            <update_rate>10</update_rate><always_on>1</always_on>
+            <visualize>false</visualize><topic>scan_2d</topic>
             <frame_id>laser_frame</frame_id>
             <lidar>
                 <scan>
+                    <!-- 500 evenly spaced azimuths; omit duplicated +pi ray. -->
                     <horizontal>
-                        <samples>690</samples>
-                        <resolution>1</resolution>
-                        <min_angle>-1.308997</min_angle>
-                        <max_angle>1.308997</max_angle>
+                        <samples>500</samples><resolution>1</resolution>
+                        <min_angle>${-pi}</min_angle>
+                        <max_angle>${pi-2*pi/500}</max_angle>
                     </horizontal>
                     <vertical>
-                        <samples>32</samples>
-                        <resolution>1</resolution>
-                        <min_angle>0.0</min_angle>
-                        <max_angle>1.047198</max_angle>
+                        <samples>1</samples><resolution>1</resolution>
+                        <min_angle>0</min_angle><max_angle>0</max_angle>
                     </vertical>
                 </scan>
-                <range>
-                    <min>0.3</min>
-                    <max>12.0</max>
-                    <resolution>0.01</resolution>
-                </range>
+                <range><min>0.05</min><max>12.0</max><resolution>0.015</resolution></range>
             </lidar>
         </sensor>
     </gazebo>
-
 </robot>

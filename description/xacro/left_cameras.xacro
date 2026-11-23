@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Compatibility entry point: robot_core.xacro already includes this file.
+         It now instantiates all two OAK-1 W OV9782 cameras on the left, not a stereo pair. -->
+    <xacro:include filename="$(find mobile_robot)/description/xacro/camera.xacro"/>
+
+    <xacro:oak1w_ov9782_camera prefix="front_left_camera" x="0.280" y="0.115" yaw="${pi/4}"/>
+    <xacro:oak1w_ov9782_camera prefix="rear_left_camera" x="0.020" y="0.115" yaw="${3*pi/4}"/>
+</robot>

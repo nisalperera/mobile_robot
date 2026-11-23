@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Sources:
+      https://docs.luxonis.com/hardware/products/OAK-1%20W
+      https://shop.luxonis.com/products/oak-1-w
+      OV9782: 1280x800, global shutter, nominal H/V/DFOV 127/79.5/150 deg.
+      Listed housing envelope: 36x54.5x27.8 mm; mass 53 g.
+      This is a simplified BOX, not manufacturer CAD or calibrated optics.
+      ASSUMED housing orientation: X depth=27.8, Y width=54.5, Z height=36 mm.
+      Optical-center position at front face is APPROXIMATE.
+      Standard Gazebo pinhole HFOV=127 deg cannot simultaneously reproduce the
+      published VFOV and wide-angle distortion at 1280x800. Do not treat this
+      image or camera_info as calibrated OV9782 output. No distortion guessed.
+      10 FPS, clipping range, mounting XYZ, brackets are simulation choices.
+      Plate top is Z=0.018 in verified chassis frame. All yaws are user-defined.
+      Left/right names retained for existing two camera bridges; three NEW
+      cameras require separate bridge configuration, intentionally not changed.
+    -->
+    <xacro:macro name="oak1w_ov9782_camera" params="prefix x y yaw">
+        <joint name="${prefix}_joint" type="fixed">
+            <parent link="chassis"/><child link="${prefix}_link"/>
+            <origin xyz="${x} ${y} 0.056" rpy="0 0 ${yaw}"/>
+        </joint>
+        <link name="${prefix}_link">
+            <visual>
+                <geometry><box size="0.0278 0.0545 0.036"/></geometry>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <geometry><box size="0.0278 0.0545 0.036"/></geometry>
+            </collision>
+            <!-- Simplified lens marker, not an exact lens assembly. -->
+            <visual>
+                <origin xyz="0.0149 0 0" rpy="0 ${pi/2} 0"/>
+                <geometry><cylinder radius="0.006" length="0.002"/></geometry>
+                <material name="black"/>
+            </visual>
+            <!-- Visual-only 20 mm post, from plate .018 to housing bottom .038. -->
+            <visual>
+                <origin xyz="0 0 -0.028"/>
+                <geometry><cylinder radius="0.003" length="0.020"/></geometry>
+                <material name="black"/>
+            </visual>
+            <xacro:inertial_box mass="0.053" x="0.0278" y="0.0545" z="0.036">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+            </xacro:inertial_box>
+        </link>
+        <joint name="${prefix}_optical_joint" type="fixed">
+            <parent link="${prefix}_link"/><child link="${prefix}_link_optical"/>
+            <origin xyz="0.0159 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+        </joint>
+        <link name="${prefix}_link_optical"/>
+        <gazebo reference="${prefix}_link">
+            <material>Gazebo/Black</material>
+            <sensor name="${prefix}" type="camera">
+                <!-- Gazebo camera points along local +X; optical TF along +Z. -->
+                <pose>0.0159 0 0 0 0 0</pose>
+                <always_on>true</always_on><visualize>true</visualize>
+                <update_rate>10</update_rate>
+                <camera>
+                    <horizontal_fov>${127*pi/180}</horizontal_fov>
+                    <image><format>R8G8B8</format><width>1280</width><height>800</height></image>
+                    <clip><near>0.02</near><far>10.0</far></clip>
+                </camera>
+                <topic>${prefix}/image</topic>
+                <frame_name>${prefix}_link_optical</frame_name>
+            </sensor>
+        </gazebo>
+    </xacro:macro>
+    <!-- Proposed XYZ relative to chassis, not coordinates measured from image.
+         Preserve chassis origin offset; plate spans X=-.025 to .325, Y=+/-.15. -->
+</robot>

@@ -7,8 +7,8 @@ AMCL and Nav2 are NOT started — use localization.launch.py for those.
 
 Odometry pipeline
 -----------------
-  diff_drive_controller --> /odom/raw
-  imu_complementary_filter (real) or Ignition IMU bridge (sim) --> /imu_fixed/data
+  Simulation wheel input: /diff_drive_controller/odom
+  Simulation IMU input: /imu_fixed; hardware configuration is separate
   robot_localization EKF --> /odom  (fused, IMU-stabilised)
   EKF also publishes the odom -> base_footprint TF (publish_odom_tf: false
   in controllers.yaml so only ONE node writes this transform).
@@ -77,6 +77,7 @@ def generate_launch_description():
         name='robot_state_publisher',
         output='both',
         parameters=[{
+            'use_sim_time': use_sim_time,
             'robot_description': ParameterValue(
                 Command([
                     'xacro', ' ', xacro_file,
@@ -122,9 +123,8 @@ def generate_launch_description():
     )
 
 
-    # Remap /diff_drive_controller/odom -> /odom/raw so the EKF can
-    # subscribe to the raw wheel encoder odometry on a separate topic
-    # from the fused /odom output that SLAM and Nav2 consume.
+    # Hardware controller publishes its native wheel-odometry topic.
+    # The EKF consumes that topic directly, separately from fused /odom.
     diff_drive_spawner = Node(
         package='controller_manager',
         executable='spawner',
@@ -132,9 +132,6 @@ def generate_launch_description():
         condition=UnlessCondition(sim_mode),
         arguments=['diff_drive_controller'],
         parameters=[{'use_sim_time': use_sim_time}],
-        remappings=[
-            ('/diff_drive_controller/odom', '/odom/raw'),
-        ],
     )
 
 
@@ -149,60 +146,32 @@ def generate_launch_description():
 
 
     # ── IMU complementary filter (real robot only) ──────────────────────
-    # In sim mode the Ignition IMU bridge publishes on /imu_fixed.
-    # The EKF config expects /imu/data in both modes, so in sim mode
-    # we remap /imu_fixed -> /imu/data on the EKF node (see below).
     imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter.yaml')
+        # Hardware-only IMU interface:
+    # /imu/data_raw -> complementary filter -> /imu/data.
     imu_filter = Node(
         package='imu_complementary_filter',
         executable='complementary_filter_node',
         name='imu_complementary_filter',
         output='screen',
         condition=UnlessCondition(sim_mode),
-        parameters=[imu_filter_params, {'use_sim_time': use_sim_time}],
+        parameters=[
+            imu_filter_params,
+            {'use_sim_time': use_sim_time},
+        ],
         remappings=[
-            ('/imu/data_raw', '/imu/data_raw'),
-            ('/imu/data',     '/imu/data'),
+            ('imu/data_raw', '/imu/data_raw'),
+            ('imu/data', '/imu/data'),
         ],
     )
 
 
-    # ── EKF (Extended Kalman Filter) ──────────────────────────────────
-    # Fuses /odom/raw (wheel encoders) + /imu/data (angular velocity)
-    # and publishes the smoothed estimate on /odom + odom->base_footprint TF.
-    #
-    # In sim mode:  Ignition publishes the IMU on /imu (no /imu/data).
-    #               We remap /imu -> /imu/data here so ekf.yaml is
-    #               identical in both sim and real-robot modes.
-    #
-    # In real mode: imu_complementary_filter already publishes /imu/data
-    #               so no remapping is needed.
-    #
-    # The /odom/raw topic comes from:
-    #   - Real robot: diff_drive_spawner remapping above
-    #   - Sim mode:   gz.launch.py bridges the Ignition odom to /odom;
-    #                 we remap /odom -> /odom/raw here so the EKF sees
-    #                 the raw odom on the correct topic in sim too.
-    #
-    # BUGFIX (map-rotation-fix): the sim node previously ALSO remapped
-    # its published output ('odometry/filtered') to '/odom' -- the same
-    # topic it remaps its raw INPUT from. That made the node subscribe
-    # to and publish on '/odom' at the same time, creating a feedback
-    # loop where the filter partially fed its own fused output back in
-    # as if it were fresh wheel odometry. Small turns stayed inside
-    # SLAM's scan-match tolerance and self-corrected; larger turns
-    # amplified through the loop faster than scan matching could
-    # compensate, producing a diverging yaw estimate that SLAM Toolbox
-    # read as a disconnected pose -- i.e. a rotated, overlapping map.
-    #
-    # Fix: do NOT remap the fused output to '/odom' in sim mode. Leave
-    # it on the ROS 2 default 'odometry/filtered' topic. Nothing in
-    # this launch file subscribes to a fused '/odom' topic directly --
-    # SLAM Toolbox only consumes the odom->base_footprint TF that the
-    # EKF publishes via publish_tf: true in ekf.yaml, so no functionality
-    # is lost by dropping this remap.
+    # Simulation state estimation.
+    # Wheel feedback enters on the controller's verified odometry topic.
+    # Fused odometry is published separately on /odom.
+    # This is an explicit simulation exception to the /odom/raw convention.
+    # Real-hardware input configuration is kept separate below.
     ekf_params_file = os.path.join(pkg_share, 'config', 'ekf.yaml')
-
 
     ekf_node_sim = Node(
         package='robot_localization',
@@ -210,34 +179,44 @@ def generate_launch_description():
         name='ekf_filter_node',
         output='screen',
         condition=IfCondition(sim_mode),
-        parameters=[ekf_params_file, {'use_sim_time': use_sim_time}],
+        parameters=[
+            ekf_params_file,
+            {
+                'use_sim_time': use_sim_time,
+                'odom0': '/diff_drive_controller/odom',
+                'imu0': '/imu_fixed',
+                'imu0_config': [
+                    False, False, False,
+                    False, False, False,
+                    False, False, False,
+                    False, False, True,
+                    False, False, False,
+                ],
+                'imu0_remove_gravitational_acceleration': False,
+            },
+        ],
         remappings=[
-            # Gazebo bridge publishes raw wheel odom on /odom
-            ('/odom/raw', '/odom'),
-            # Ignition IMU bridge publishes on /imu, not /imu/data
-            ('/imu/data', '/imu'),
-            # NOTE: fused output ('odometry/filtered') is intentionally
-            # left un-remapped -- see BUGFIX comment above. It now
-            # publishes to the default 'odometry/filtered' topic instead
-            # of colliding with the raw-odom input topic '/odom'.
+            ('odometry/filtered', '/odom'),
         ],
     )
 
-
+        # Hardware inputs are explicit and do not inherit the sim IMU topic.
+    # Source configuration only; physical operation is not validated.
     ekf_node_real = Node(
         package='robot_localization',
         executable='ekf_node',
         name='ekf_filter_node',
         output='screen',
         condition=UnlessCondition(sim_mode),
-        parameters=[ekf_params_file, {'use_sim_time': use_sim_time}],
+        parameters=[
+            ekf_params_file,
+            {
+                'use_sim_time': use_sim_time,
+                'odom0': '/diff_drive_controller/odom',
+                'imu0': '/imu/data',
+            },
+        ],
         remappings=[
-            # diff_drive_spawner remaps /diff_drive_controller/odom -> /odom/raw
-            ('/odom/raw', '/odom/raw'),
-            # imu_complementary_filter publishes on /imu/data
-            ('/imu/data', '/imu/data'),
-            # EKF fused output -> /odom (safe here: input is /odom/raw,
-            # a different topic name, so no feedback loop is created)
             ('odometry/filtered', '/odom'),
         ],
     )
@@ -317,7 +296,7 @@ def generate_launch_description():
         ),
         LogInfo(msg=(
             '[mapping.launch.py] Mode: MAPPING — SLAM Toolbox active, '
-            'EKF fusing /odom/raw + /imu/data -> /odom, AMCL/Nav2 NOT started.'
+            'Simulation EKF: /diff_drive_controller/odom + /imu_fixed -> /odom. AMCL/Nav2 NOT started.'
         )),
         # ── RSP (all modes) ─────────────────────────────────────────
         robot_state_publisher,

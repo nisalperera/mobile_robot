@@ -1,22 +1,13 @@
 # imu_filter.yaml
 #
-# Parameters for the imu_complementary_filter node (package: imu_complementary_filter).
-# Used on the REAL ROBOT (Jetson Xavier NX) to fuse raw IMU data from the hardware
-# driver into a filtered orientation estimate.
-#
-# Install:  sudo apt install ros-foxy-imu-complementary-filter
-#
-# Launch:   ros2 run imu_complementary_filter complementary_filter_node \
-#               --ros-args --params-file config/imu_fixed_fixed_filter.yaml
-#
-# Topics consumed:  /imu_fixed/data_raw   (sensor_msgs/msg/imu_fixed — from hardware driver)
-# Topics produced:  /imu_fixed/data       (sensor_msgs/msg/imu_fixed — filtered, with orientation)
-#
-# In SIMULATION the Ignition IMU plugin already outputs angular velocity +
-# linear acceleration without a separate filter node.  The bridge re-publishes
-# directly on /imu_fixed so no filter is needed in sim mode.
+# Hardware-only complementary-filter configuration.
+# Launched node name: imu_complementary_filter
+# Expected input: /imu/data_raw, sensor_msgs/msg/Imu
+# Filtered output: /imu/data, sensor_msgs/msg/Imu
+# Hardware driver topic and sensor frame require bring-up validation.
+# Simulation uses /imu_fixed directly and does not start this filter.
 
-complementary_filter_node:
+imu_complementary_filter:
     ros__parameters:
         # Input/output topic remapping is done via CLI remapping; these params
         # control filter behaviour only.
