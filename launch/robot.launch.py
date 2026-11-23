@@ -31,7 +31,8 @@ def generate_launch_description():
     # On the real robot pass sim_mode:=false use_sim_time:=false.
     # In simulation (default) both are true.
     sim_mode = LaunchConfiguration('sim_mode')
-
+    use_yolo = LaunchConfiguration('use_yolo')
+    
     pkg_share = get_package_share_directory(package_name)
     xacro_file = pkg_share + '/description/robot.urdf.xacro'
 
@@ -285,6 +286,11 @@ def generate_launch_description():
         # Sim-mode: Gazebo handles everything (RSP, control, odom TF)
         gazebo_sim,
         # Real-robot mode: RSP + control stack + IMU filter launched here
+        DeclareLaunchArgument(
+            'use_yolo',
+            default_value='false',
+            description='Use YOLO detection if true'
+        ),
         robot_state_publisher,
         control_node,
         diff_drive_spawner,
@@ -303,7 +309,7 @@ def generate_launch_description():
         twist_mux,
     ]
 
-    if os.environ.get('ULTRALYTICS', 'false') == 'true':
+    if os.environ.get('ULTRALYTICS', 'false') == 'true' and use_yolo:
         import torch
         detector_node = Node(
             package='yolo_detection',
