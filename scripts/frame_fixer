@@ -1,0 +1,7 @@
+#!/usr/bin/python3
+
+from mobile_robot.frame_fixer import main
+
+
+if __name__ == '__main__':
+    main()

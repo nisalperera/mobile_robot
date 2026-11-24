@@ -129,6 +129,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from mobile_robot.launch_helpers import frame_fixer_node
+
 
 logger = logging.getLogger('launch')
 
@@ -326,46 +328,46 @@ def generate_launch_description():
     # publisher (Best Effort, set via qos_overrides in
     # pointcloud_to_laserscan.launch.py), so /scan_fixed inherits Best
     # Effort automatically -- see BUGFIX note in the module docstring.
-    scan_frame_fixer = ExecuteProcess(
-        cmd=[
-            '/usr/bin/python3', '-u', '-c', "import sys\nimport time\nimport rclpy\nfrom rclpy.node import Node\nfrom rclpy.qos import QoSProfile, ReliabilityPolicy, qos_profile_sensor_data\nfrom sensor_msgs.msg import Image, Imu, LaserScan\n\nclass FrameRelay(Node):\n    def __init__(self):\n        name, kind, source, target, frame = sys.argv[1:6]\n        super().__init__(name)\n        self.frame = frame\n        self.kind = kind\n        self.source = source\n        self.last_sample = None\n        msg_type = {'Image': Image, 'Imu': Imu, 'LaserScan': LaserScan}[kind]\n        self.publisher = self.create_publisher(msg_type, target, QoSProfile(depth=5, reliability=ReliabilityPolicy.RELIABLE))\n        self.subscription = self.create_subscription(msg_type, source, self.receive, qos_profile_sensor_data)\n        self.watchdog = self.create_timer(10.0, self.check_input)\n        self.get_logger().info(f'Waiting for {source}; publishing received samples on {target} with frame {frame}')\n\n    def receive(self, msg):\n        if self.last_sample is None:\n            self.get_logger().info(f'First sample received on {self.source}')\n        self.last_sample = time.monotonic()\n        msg.header.frame_id = self.frame\n        if self.kind == 'Imu':\n            msg.orientation_covariance = [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n            msg.angular_velocity_covariance = [2.5e-5, 0.0, 0.0, 0.0, 2.5e-5, 0.0, 0.0, 0.0, 2.5e-5]\n            msg.linear_acceleration_covariance = [1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4]\n        self.publisher.publish(msg)\n\n    def check_input(self):\n        if self.last_sample is None:\n            self.get_logger().warning(f'No samples on {self.source}; check the sensor and bridge. No synthetic samples published.')\n        elif time.monotonic() - self.last_sample > 10.0:\n            self.get_logger().warning(f'Stale input on {self.source}; check source or paused simulation.')\n\nrclpy.init()\nnode = FrameRelay()\ntry:\n    rclpy.spin(node)\nexcept KeyboardInterrupt:\n    pass\nfinally:\n    node.destroy_node()\n    if rclpy.ok():\n        rclpy.shutdown()\n",
-            'scan_frame_fixer', 'LaserScan', '/scan', '/scan_fixed', 'laser_frame',
-            '--ros-args', '-p', ['use_sim_time:=', use_sim_time],
-        ],
-        output='screen',
+    scan_frame_fixer = frame_fixer_node(
+        name='scan_frame_fixer',
+        kind='LaserScan',
+        source='/scan',
+        target='/scan_fixed',
+        frame='laser_frame',
+        use_sim_time=use_sim_time,
     )
 
 
     # --- Left camera ---------------------------------------------------------
-    left_camera_frame_fixer = ExecuteProcess(
-        cmd=[
-            '/usr/bin/python3', '-u', '-c', "import sys\nimport time\nimport rclpy\nfrom rclpy.node import Node\nfrom rclpy.qos import QoSProfile, ReliabilityPolicy, qos_profile_sensor_data\nfrom sensor_msgs.msg import Image, Imu, LaserScan\n\nclass FrameRelay(Node):\n    def __init__(self):\n        name, kind, source, target, frame = sys.argv[1:6]\n        super().__init__(name)\n        self.frame = frame\n        self.kind = kind\n        self.source = source\n        self.last_sample = None\n        msg_type = {'Image': Image, 'Imu': Imu, 'LaserScan': LaserScan}[kind]\n        self.publisher = self.create_publisher(msg_type, target, QoSProfile(depth=5, reliability=ReliabilityPolicy.RELIABLE))\n        self.subscription = self.create_subscription(msg_type, source, self.receive, qos_profile_sensor_data)\n        self.watchdog = self.create_timer(10.0, self.check_input)\n        self.get_logger().info(f'Waiting for {source}; publishing received samples on {target} with frame {frame}')\n\n    def receive(self, msg):\n        if self.last_sample is None:\n            self.get_logger().info(f'First sample received on {self.source}')\n        self.last_sample = time.monotonic()\n        msg.header.frame_id = self.frame\n        if self.kind == 'Imu':\n            msg.orientation_covariance = [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n            msg.angular_velocity_covariance = [2.5e-5, 0.0, 0.0, 0.0, 2.5e-5, 0.0, 0.0, 0.0, 2.5e-5]\n            msg.linear_acceleration_covariance = [1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4]\n        self.publisher.publish(msg)\n\n    def check_input(self):\n        if self.last_sample is None:\n            self.get_logger().warning(f'No samples on {self.source}; check the sensor and bridge. No synthetic samples published.')\n        elif time.monotonic() - self.last_sample > 10.0:\n            self.get_logger().warning(f'Stale input on {self.source}; check source or paused simulation.')\n\nrclpy.init()\nnode = FrameRelay()\ntry:\n    rclpy.spin(node)\nexcept KeyboardInterrupt:\n    pass\nfinally:\n    node.destroy_node()\n    if rclpy.ok():\n        rclpy.shutdown()\n",
-            'left_camera_frame_fixer', 'Image', '/left_camera/image', '/left_camera/image_fixed', 'left_camera_link_optical',
-            '--ros-args', '-p', ['use_sim_time:=', use_sim_time],
-        ],
-        output='screen',
+    left_camera_frame_fixer = frame_fixer_node(
+        name='left_camera_frame_fixer',
+        kind='Image',
+        source='/left_camera/image',
+        target='/left_camera/image_fixed',
+        frame='left_camera_link_optical',
+        use_sim_time=use_sim_time,
     )
 
 
     # --- Right camera --------------------------------------------------------
-    right_camera_frame_fixer = ExecuteProcess(
-        cmd=[
-            '/usr/bin/python3', '-u', '-c', "import sys\nimport time\nimport rclpy\nfrom rclpy.node import Node\nfrom rclpy.qos import QoSProfile, ReliabilityPolicy, qos_profile_sensor_data\nfrom sensor_msgs.msg import Image, Imu, LaserScan\n\nclass FrameRelay(Node):\n    def __init__(self):\n        name, kind, source, target, frame = sys.argv[1:6]\n        super().__init__(name)\n        self.frame = frame\n        self.kind = kind\n        self.source = source\n        self.last_sample = None\n        msg_type = {'Image': Image, 'Imu': Imu, 'LaserScan': LaserScan}[kind]\n        self.publisher = self.create_publisher(msg_type, target, QoSProfile(depth=5, reliability=ReliabilityPolicy.RELIABLE))\n        self.subscription = self.create_subscription(msg_type, source, self.receive, qos_profile_sensor_data)\n        self.watchdog = self.create_timer(10.0, self.check_input)\n        self.get_logger().info(f'Waiting for {source}; publishing received samples on {target} with frame {frame}')\n\n    def receive(self, msg):\n        if self.last_sample is None:\n            self.get_logger().info(f'First sample received on {self.source}')\n        self.last_sample = time.monotonic()\n        msg.header.frame_id = self.frame\n        if self.kind == 'Imu':\n            msg.orientation_covariance = [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n            msg.angular_velocity_covariance = [2.5e-5, 0.0, 0.0, 0.0, 2.5e-5, 0.0, 0.0, 0.0, 2.5e-5]\n            msg.linear_acceleration_covariance = [1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4]\n        self.publisher.publish(msg)\n\n    def check_input(self):\n        if self.last_sample is None:\n            self.get_logger().warning(f'No samples on {self.source}; check the sensor and bridge. No synthetic samples published.')\n        elif time.monotonic() - self.last_sample > 10.0:\n            self.get_logger().warning(f'Stale input on {self.source}; check source or paused simulation.')\n\nrclpy.init()\nnode = FrameRelay()\ntry:\n    rclpy.spin(node)\nexcept KeyboardInterrupt:\n    pass\nfinally:\n    node.destroy_node()\n    if rclpy.ok():\n        rclpy.shutdown()\n",
-            'right_camera_frame_fixer', 'Image', '/right_camera/image', '/right_camera/image_fixed', 'right_camera_link_optical',
-            '--ros-args', '-p', ['use_sim_time:=', use_sim_time],
-        ],
-        output='screen',
+    right_camera_frame_fixer = frame_fixer_node(
+        name='right_camera_frame_fixer',
+        kind='Image',
+        source='/right_camera/image',
+        target='/right_camera/image_fixed',
+        frame='right_camera_link_optical',
+        use_sim_time=use_sim_time,
     )
 
 
     # --- IMU -----------------------------------------------------------------
-    imu_frame_fixer = ExecuteProcess(
-        cmd=[
-            '/usr/bin/python3', '-u', '-c', "import sys\nimport time\nimport rclpy\nfrom rclpy.node import Node\nfrom rclpy.qos import QoSProfile, ReliabilityPolicy, qos_profile_sensor_data\nfrom sensor_msgs.msg import Image, Imu, LaserScan\n\nclass FrameRelay(Node):\n    def __init__(self):\n        name, kind, source, target, frame = sys.argv[1:6]\n        super().__init__(name)\n        self.frame = frame\n        self.kind = kind\n        self.source = source\n        self.last_sample = None\n        msg_type = {'Image': Image, 'Imu': Imu, 'LaserScan': LaserScan}[kind]\n        self.publisher = self.create_publisher(msg_type, target, QoSProfile(depth=5, reliability=ReliabilityPolicy.RELIABLE))\n        self.subscription = self.create_subscription(msg_type, source, self.receive, qos_profile_sensor_data)\n        self.watchdog = self.create_timer(10.0, self.check_input)\n        self.get_logger().info(f'Waiting for {source}; publishing received samples on {target} with frame {frame}')\n\n    def receive(self, msg):\n        if self.last_sample is None:\n            self.get_logger().info(f'First sample received on {self.source}')\n        self.last_sample = time.monotonic()\n        msg.header.frame_id = self.frame\n        if self.kind == 'Imu':\n            msg.orientation_covariance = [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n            msg.angular_velocity_covariance = [2.5e-5, 0.0, 0.0, 0.0, 2.5e-5, 0.0, 0.0, 0.0, 2.5e-5]\n            msg.linear_acceleration_covariance = [1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4]\n        self.publisher.publish(msg)\n\n    def check_input(self):\n        if self.last_sample is None:\n            self.get_logger().warning(f'No samples on {self.source}; check the sensor and bridge. No synthetic samples published.')\n        elif time.monotonic() - self.last_sample > 10.0:\n            self.get_logger().warning(f'Stale input on {self.source}; check source or paused simulation.')\n\nrclpy.init()\nnode = FrameRelay()\ntry:\n    rclpy.spin(node)\nexcept KeyboardInterrupt:\n    pass\nfinally:\n    node.destroy_node()\n    if rclpy.ok():\n        rclpy.shutdown()\n",
-            'imu_frame_fixer', 'Imu', '/imu', '/imu_fixed', 'imu_link',
-            '--ros-args', '-p', ['use_sim_time:=', use_sim_time],
-        ],
-        output='screen',
+    imu_frame_fixer = frame_fixer_node(
+        name='imu_frame_fixer',
+        kind='Imu',
+        source='/imu',
+        target='/imu_fixed',
+        frame='imu_link',
+        use_sim_time=use_sim_time,
     )
 
 
