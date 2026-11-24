@@ -4,5 +4,5 @@
          It now instantiates all two OAK-1 W OV9782 cameras on the left, not a stereo pair. -->
     <xacro:include filename="$(find mobile_robot)/description/xacro/camera.xacro"/>
 
-    <xacro:oak1w_ov9782_camera prefix="front_camera" x="0.290" y="0" yaw="0"/>
+    <xacro:oak1w_ov9782_camera prefix="front_center_camera" x="0.290" y="0" yaw="0"/>
 </robot>

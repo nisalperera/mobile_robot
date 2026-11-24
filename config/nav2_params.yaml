@@ -180,12 +180,7 @@ local_costmap:
       # Set footprint as a string containing an ordered list of [x, y] points (in meters)
       # relative to robot_base_frame (typically base_link or base_footprint)
       # For 4-wheel mecanum robot: 40cm x 40cm square
-      # footprint: "[[-0.20, -0.20], [-0.20, 0.20], [0.20, 0.20], [0.20, -0.20]]"
-      footprint:
-        - [-0.20, -0.20]
-        - [-0.20, 0.20]
-        - [0.20, 0.20]
-        - [0.20, -0.20]
+      footprint: "[[-0.20, -0.20], [-0.20, 0.20], [0.20, 0.20], [0.20, -0.20]]"
       rolling_window: true
       width: 3
       height: 3
@@ -232,12 +227,7 @@ global_costmap:
       use_sim_time: True
       # Set footprint as a string containing an ordered list of [x, y] points (in meters)
       # relative to robot_base_frame (typically base_link or base_footprint)
-      # footprint: "[[-0.20, -0.20], [-0.20, 0.20], [0.20, 0.20], [0.20, -0.20]]"
-      footprint:
-        - [-0.20, -0.20]
-        - [-0.20, 0.20]
-        - [0.20, 0.20]
-        - [0.20, -0.20]
+      footprint: "[[-0.20, -0.20], [-0.20, 0.20], [0.20, 0.20], [0.20, -0.20]]"
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       obstacle_layer:

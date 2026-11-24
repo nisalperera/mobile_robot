@@ -67,6 +67,4 @@
             </sensor>
         </gazebo>
     </xacro:macro>
-    <!-- Proposed XYZ relative to chassis, not coordinates measured from image.
-         Preserve chassis origin offset; plate spans X=-.025 to .325, Y=+/-.15. -->
 </robot>

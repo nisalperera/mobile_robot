@@ -69,29 +69,69 @@
   direction: GZ_TO_ROS
 
 
-- ros_topic_name: "/left_camera/image"
-  gz_topic_name: "/left_camera/image"
+- ros_topic_name: "/front_center_camera/image"
+  gz_topic_name: "/front_center_camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   gz_type_name: "ignition.msgs.Image"
   direction: GZ_TO_ROS
 
 
-- ros_topic_name: "/left_camera/camera_info"
-  gz_topic_name: "/left_camera/camera_info"
+- ros_topic_name: "/front_center_camera/camera_info"
+  gz_topic_name: "/front_center_camera/camera_info"
   ros_type_name: "sensor_msgs/msg/CameraInfo"
   gz_type_name: "ignition.msgs.CameraInfo"
   direction: GZ_TO_ROS
 
 
-- ros_topic_name: "/right_camera/image"
-  gz_topic_name: "/right_camera/image"
+- ros_topic_name: "/front_left_camera/image"
+  gz_topic_name: "/front_left_camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   gz_type_name: "ignition.msgs.Image"
   direction: GZ_TO_ROS
 
 
-- ros_topic_name: "/right_camera/camera_info"
-  gz_topic_name: "/right_camera/camera_info"
+- ros_topic_name: "/front_left_camera/camera_info"
+  gz_topic_name: "/front_left_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "ignition.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/rear_left_camera/image"
+  gz_topic_name: "/rear_left_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "ignition.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/rear_left_camera/camera_info"
+  gz_topic_name: "/rear_left_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "ignition.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+
+- ros_topic_name: "/front_right_camera/image"
+  gz_topic_name: "/front_right_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "ignition.msgs.Image"
+  direction: GZ_TO_ROS
+
+
+- ros_topic_name: "/front_right_camera/camera_info"
+  gz_topic_name: "/front_right_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "ignition.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+
+- ros_topic_name: "/rear_right_camera/image"
+  gz_topic_name: "/rear_right_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "ignition.msgs.Image"
+  direction: GZ_TO_ROS
+
+
+- ros_topic_name: "/rear_right_camera/camera_info"
+  gz_topic_name: "/rear_right_camera/camera_info"
   ros_type_name: "sensor_msgs/msg/CameraInfo"
   gz_type_name: "ignition.msgs.CameraInfo"
   direction: GZ_TO_ROS
