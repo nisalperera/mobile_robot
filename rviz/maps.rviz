@@ -3,7 +3,9 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /LaserScan1
+        - /LaserScan1/Topic1
       Splitter Ratio: 0.5
     Tree Height: 752
   - Class: rviz_common/Selection
@@ -82,6 +84,11 @@ Visualization Manager:
           Show Trail: false
           Value: true
         front_right_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        imu_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -170,31 +177,10 @@ Visualization Manager:
         Durability Policy: Volatile
         Filter size: 10
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /scan
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
-    - Alpha: 0.699999988079071
-      Class: rviz_default_plugins/Map
-      Color Scheme: map
-      Draw Behind: false
-      Enabled: true
-      Name: Map
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /map
-      Update Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /map_updates
-      Use Timestamp: false
       Value: true
     - Alpha: 0.699999988079071
       Class: rviz_default_plugins/Map
@@ -263,7 +249,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 24.140113830566406
+      Distance: 13.785395622253418
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
